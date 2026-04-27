@@ -20,3 +20,11 @@ export function wagerLabel(wager: string) {
   return "Wager";
 }
 
+export function wagerDescription(wager: string) {
+  if (wager === "hot-seat") return "Loser pays for the next round of drinks.";
+  if (wager === "appetizer") return "Loser pays for the appetizer box.";
+  if (wager === "dare") return "Loser performs a dare chosen by the group.";
+  if (wager === "glitch") return "The one who flinches loses and has to live with that.";
+  return "Host chooses what you play for.";
+}
+

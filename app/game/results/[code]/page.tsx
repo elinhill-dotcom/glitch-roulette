@@ -44,14 +44,35 @@ export default function ResultsPage() {
       const a = game.scores[bestId] ?? { safe: 0, glitched: 0, betPoints: 0 };
       const b = game.scores[id] ?? { safe: 0, glitched: 0, betPoints: 0 };
       if (anyGlitched) {
-        // fewer glitches wins
+        // fewer glitches wins, tie-break by betting points
         if (b.glitched < a.glitched) bestId = id;
+        else if (b.glitched === a.glitched && b.betPoints > a.betPoints) bestId = id;
       } else {
         // betting wins if no glitches
         if (b.betPoints > a.betPoints) bestId = id;
       }
     }
     return players.find((p) => p.id === bestId) ?? null;
+  }, [anyGlitched, game, players]);
+
+  const loser = React.useMemo(() => {
+    if (!game) return null;
+    const order = game.playerOrder;
+    if (order.length === 0) return null;
+    let worstId = order[0]!;
+    for (const id of order.slice(1)) {
+      const a = game.scores[worstId] ?? { safe: 0, glitched: 0, betPoints: 0 };
+      const b = game.scores[id] ?? { safe: 0, glitched: 0, betPoints: 0 };
+      if (anyGlitched) {
+        // more glitches loses, tie-break by fewer betting points
+        if (b.glitched > a.glitched) worstId = id;
+        else if (b.glitched === a.glitched && b.betPoints < a.betPoints) worstId = id;
+      } else {
+        // betting loses if no glitches
+        if (b.betPoints < a.betPoints) worstId = id;
+      }
+    }
+    return players.find((p) => p.id === worstId) ?? null;
   }, [anyGlitched, game, players]);
 
   const done = game?.phase === "finished";
@@ -141,7 +162,7 @@ export default function ResultsPage() {
             </div>
             <Button
               onClick={() => {
-                const msg = `🌶️ I played "Not a Flinch" on Flinch Roulette! ${winner.name} won 🏆 #NotAFlinch #SpiceChallenge #FlinchRoulette`;
+                const msg = `🌶️ I played "Not a Flinch" on Flinch Roulette! ${winner.name} won 🏆${loser ? ` — ${loser.name} lost 😭` : ""} #NotAFlinch #SpiceChallenge #FlinchRoulette`;
                 navigator.clipboard.writeText(msg);
               }}
             >

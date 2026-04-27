@@ -10,6 +10,7 @@ export default function JoinRoomPage() {
   const router = useRouter();
   const [code, setCode] = React.useState("");
   const [name, setName] = React.useState("Player");
+  const [online, setOnline] = React.useState(false);
 
   const cleanCode = code.toUpperCase().replace(/[^A-Z0-9]/g, "").slice(0, 6);
 
@@ -55,9 +56,29 @@ export default function JoinRoomPage() {
             </label>
           </div>
 
+          <label className="flex items-center justify-between gap-3 rounded-2xl border border-white/10 bg-white/5 px-4 py-3">
+            <div className="min-w-0">
+              <div className="text-sm font-black">Online multiplayer</div>
+              <div className="mt-1 text-xs text-[var(--muted)]">
+                Join across devices/networks (uses Firestore).
+              </div>
+            </div>
+            <input
+              type="checkbox"
+              checked={online}
+              onChange={(e) => setOnline(e.target.checked)}
+              className="h-5 w-5 accent-[var(--green)]"
+              aria-label="Enable online multiplayer"
+            />
+          </label>
+
           <Button
             size="lg"
-            onClick={() => router.push(`/game/room/${cleanCode}?name=${encodeURIComponent(name)}`)}
+            onClick={() =>
+              router.push(
+                `/game/room/${cleanCode}?name=${encodeURIComponent(name)}&mode=${online ? "online" : "local"}`,
+              )
+            }
             disabled={cleanCode.length !== 6}
           >
             Join

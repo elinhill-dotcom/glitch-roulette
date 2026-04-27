@@ -60,6 +60,13 @@ export type RoomState = {
   dispatch: (action: RoomAction) => void;
 };
 
+export type RoomMode = "local" | "online";
+
+export type UseRoomOptions = {
+  isHostHint?: boolean;
+  mode?: RoomMode;
+};
+
 function uniqPlayers(players: RoomPlayer[]) {
   const map = new Map<string, RoomPlayer>();
   for (const p of players) map.set(p.id, p);
@@ -115,6 +122,11 @@ function applyHostAction(
   const currentPlayer = currentPlayerId ? playerMap.get(currentPlayerId) : undefined;
 
   const scores = ensureScores(state, players);
+  const voters = state.playerOrder.filter((pid) => pid !== currentPlayerId);
+  const flinchByVotes = (judgeVotes: Record<string, JudgeVote>) => {
+    const yes = voters.filter((pid) => judgeVotes[pid] === "yes").length;
+    return yes >= 2;
+  };
 
   switch (action.a) {
     case "init": {
@@ -201,7 +213,13 @@ function applyHostAction(
     case "finish_eat": {
       if (state.phase !== "eat") return state;
       if (actorId !== currentPlayerId) return state;
-      return { ...state, phase: "confirm", eatEndsAt: undefined, judgeVerdict: "safe" };
+      const verdictGlitch = flinchByVotes(state.judgeVotes);
+      return {
+        ...state,
+        phase: "confirm",
+        eatEndsAt: undefined,
+        judgeVerdict: verdictGlitch ? "glitch" : "safe",
+      };
     }
     case "confirm_bite": {
       if (state.phase !== "confirm") return state;
@@ -269,16 +287,26 @@ function applyHostAction(
       };
     }
     case "judge_vote": {
-      if (state.phase !== "judge") return state;
+      if (state.phase !== "judge" && state.phase !== "eat") return state;
       if (actorId === currentPlayerId) return state;
       const judgeVotes = { ...state.judgeVotes, [actorId]: action.vote };
-      const voters = state.playerOrder.filter((pid) => pid !== currentPlayerId);
-      const allVoted = voters.every((pid) => judgeVotes[pid]);
-      if (!allVoted) return { ...state, judgeVotes };
+      const verdictGlitch = flinchByVotes(judgeVotes);
 
-      const yes = voters.filter((pid) => judgeVotes[pid] === "yes").length;
-      const verdictGlitch = yes >= Math.ceil(voters.length / 2);
-      // After judging, eater must confirm heat (mild/hot). Verdict is stored for confirm.
+      // If we're still in the eating window, allow live voting and auto-lock once threshold is hit.
+      if (state.phase === "eat") {
+        if (!verdictGlitch) return { ...state, judgeVotes };
+        return {
+          ...state,
+          judgeVotes,
+          judgeVerdict: "glitch",
+          phase: "confirm",
+          eatEndsAt: undefined,
+        };
+      }
+
+      // Legacy judge phase (kept): if host still uses it, we end on threshold or when all have voted.
+      const allVoted = voters.every((pid) => judgeVotes[pid]);
+      if (!allVoted && !verdictGlitch) return { ...state, judgeVotes };
       return {
         ...state,
         judgeVotes,
@@ -497,6 +525,51 @@ function useRoomFirestore(roomCode: string, name: string, isHostHint?: boolean):
     void recordSpicySessionEnd({ code: roomCode, startedAt, endedAt: Date.now() }).catch(() => {});
   }, [isHost, roomCode, game?.phase]);
 
+  // Timer progression handled by host: transition countdown -> eat -> confirm (auto-judge by votes).
+  React.useEffect(() => {
+    if (!isHost) return;
+    if (!game) return;
+    if (game.hostId !== self.id) return;
+
+    if (game.phase === "countdown" && game.countdownEndsAt) {
+      const ms = Math.max(0, game.countdownEndsAt - Date.now());
+      const t = window.setTimeout(() => {
+        const cur = gameRef.current;
+        if (!cur || cur.hostId !== self.id) return;
+        if (cur.phase !== "countdown") return;
+        const now = Date.now();
+        const next: NotAGlitchState = {
+          ...cur,
+          phase: "eat",
+          countdownEndsAt: undefined,
+          eatEndsAt: now + 30000,
+        };
+        void updateDoc(roomRef, { game: next, lastActiveAt: Date.now() }).catch(() => {});
+      }, ms + 40);
+      return () => window.clearTimeout(t);
+    }
+
+    if (game.phase === "eat" && game.eatEndsAt) {
+      const ms = Math.max(0, game.eatEndsAt - Date.now());
+      const t = window.setTimeout(() => {
+        const cur = gameRef.current;
+        if (!cur || cur.hostId !== self.id) return;
+        if (cur.phase !== "eat") return;
+        const voters = cur.playerOrder.filter((pid) => pid !== cur.playerOrder[cur.currentPlayerIndex]);
+        const yes = voters.filter((pid) => cur.judgeVotes[pid] === "yes").length;
+        const verdictGlitch = yes >= 2;
+        const next: NotAGlitchState = {
+          ...cur,
+          phase: "confirm",
+          eatEndsAt: undefined,
+          judgeVerdict: verdictGlitch ? "glitch" : "safe",
+        };
+        void updateDoc(roomRef, { game: next, lastActiveAt: Date.now() }).catch(() => {});
+      }, ms + 60);
+      return () => window.clearTimeout(t);
+    }
+  }, [isHost, game, roomRef, self.id]);
+
   return {
     self,
     players,
@@ -507,12 +580,18 @@ function useRoomFirestore(roomCode: string, name: string, isHostHint?: boolean):
   };
 }
 
-const USE_FIRESTORE_ROOMS =
+// Firestore rooms are opt-in: local multiplayer (BroadcastChannel) is the default dev experience.
+// This avoids "can't connect" screens when Firebase credentials, rules, or network access aren't available.
+const FIRESTORE_ENABLED_BY_ENV =
+  process.env.NEXT_PUBLIC_USE_FIRESTORE_ROOMS === "1" &&
   Boolean(process.env.NEXT_PUBLIC_FIREBASE_PROJECT_ID) &&
   Boolean(process.env.NEXT_PUBLIC_FIREBASE_API_KEY);
 
-export const useRoom: (roomCode: string, name: string, isHostHint?: boolean) => RoomState =
-  USE_FIRESTORE_ROOMS ? useRoomFirestore : useRoomLocal;
+export function useRoom(roomCode: string, name: string, options?: UseRoomOptions): RoomState {
+  const mode = options?.mode ?? (FIRESTORE_ENABLED_BY_ENV ? "online" : "local");
+  const isHostHint = options?.isHostHint;
+  return mode === "online" ? useRoomFirestore(roomCode, name, isHostHint) : useRoomLocal(roomCode, name, isHostHint);
+}
 
 function useRoomLocal(roomCode: string, name: string, isHostHint?: boolean): RoomState {
   const [self] = React.useState<RoomPlayer>(() => {
@@ -733,7 +812,7 @@ function useRoomLocal(roomCode: string, name: string, isHostHint?: boolean): Roo
     void recordSpicySessionEnd({ code: roomCode, startedAt, endedAt: Date.now() }).catch(() => {});
   }, [isHost, roomCode, game?.phase]);
 
-  // Local timer progression handled by host: transition countdown -> eat -> judge.
+  // Local timer progression handled by host: transition countdown -> eat -> confirm (auto-judge by votes).
   React.useEffect(() => {
     if (!game) return;
     if (game.hostId !== self.id) return;
@@ -757,7 +836,15 @@ function useRoomLocal(roomCode: string, name: string, isHostHint?: boolean): Roo
         setGame((cur) => {
           if (!cur || cur.hostId !== self.id) return cur;
           if (cur.phase !== "eat") return cur;
-          const next: NotAGlitchState = { ...cur, phase: "judge", eatEndsAt: undefined };
+          const voters = cur.playerOrder.filter((pid) => pid !== cur.playerOrder[cur.currentPlayerIndex]);
+          const yes = voters.filter((pid) => cur.judgeVotes[pid] === "yes").length;
+          const verdictGlitch = yes >= 2;
+          const next: NotAGlitchState = {
+            ...cur,
+            phase: "confirm",
+            eatEndsAt: undefined,
+            judgeVerdict: verdictGlitch ? "glitch" : "safe",
+          };
           channelRef.current?.postMessage({ t: "state", state: next } satisfies Msg);
           return next;
         });

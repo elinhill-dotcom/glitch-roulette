@@ -9,7 +9,7 @@ import { NeonCard } from "../../../components/ui/NeonCard";
 import { CameraRecorder } from "../../../components/CameraRecorder";
 import { cn } from "../../../lib/utils";
 import { useRoom } from "../../../state/room";
-import { wagerLabel } from "../../../lib/game";
+import { wagerDescription, wagerLabel } from "../../../lib/game";
 
 export default function MultiplayerRoomPage() {
   const params = useParams<{ code: string }>();
@@ -17,8 +17,10 @@ export default function MultiplayerRoomPage() {
   const code = String(params.code ?? "").toUpperCase();
   const name = search.get("name") ?? "Player";
   const isHostHint = search.get("host") === "1";
+  const modeParam = search.get("mode");
+  const mode = modeParam === "online" ? "online" : "local";
 
-  const room = useRoom(code, name, isHostHint);
+  const room = useRoom(code, name, { isHostHint, mode });
   const game = room.game;
 
   const [startPlayerId, setStartPlayerId] = React.useState<string>(room.self.id);
@@ -33,6 +35,9 @@ export default function MultiplayerRoomPage() {
     const usedHot = (game?.protocol ?? []).filter((e) => e.heat === "hot").length;
     return Math.max(0, 2 - usedHot);
   }, [game?.protocol]);
+  const bitesRemaining = game ? Math.max(1, 12 - game.biteIndex) : 12;
+  const hotOdds = game ? hotRemaining / bitesRemaining : null;
+  const hotOddsPct = hotOdds === null ? null : Math.round(hotOdds * 100);
   const [cameraOpen, setCameraOpen] = React.useState(false);
 
   const [now, setNow] = React.useState(() => Date.now());
@@ -166,10 +171,10 @@ export default function MultiplayerRoomPage() {
               <div className="grid grid-cols-1 gap-3">
                 {(
                   [
-                    { id: "hot-seat", desc: "Loser pays the next drink round." },
-                    { id: "appetizer", desc: "Loser pays for the appetizer box." },
-                    { id: "dare", desc: "Loser does a custom dare." },
-                    { id: "glitch", desc: "Whoever burned… lives with it." },
+                    { id: "hot-seat", desc: wagerDescription("hot-seat") },
+                    { id: "appetizer", desc: wagerDescription("appetizer") },
+                    { id: "dare", desc: wagerDescription("dare") },
+                    { id: "glitch", desc: wagerDescription("glitch") },
                   ] as const
                 ).map((w) => (
                   <button
@@ -208,6 +213,62 @@ export default function MultiplayerRoomPage() {
                 </div>
               </div>
 
+              <NeonCard
+                className="relative overflow-hidden p-4"
+                glow={hotRemaining === 0 ? "none" : hotOddsPct !== null && hotOddsPct >= 40 ? "orange" : "green"}
+              >
+                <div
+                  className="pointer-events-none absolute inset-0 bg-[radial-gradient(900px_260px_at_20%_0%,color-mix(in_oklab,var(--orange),transparent_90%),transparent_60%),radial-gradient(900px_260px_at_90%_0%,color-mix(in_oklab,var(--green),transparent_90%),transparent_60%)]"
+                  aria-hidden="true"
+                />
+                <div className="relative flex flex-col gap-3">
+                  <div className="flex items-start justify-between gap-3">
+                    <div>
+                      <div className="text-xs font-black tracking-widest text-[var(--muted)]">
+                        LIVE ODDS
+                      </div>
+                      <div className="mt-1 text-sm font-black">Chance next bite is HOT</div>
+                    </div>
+                    <div className="text-right">
+                      <div className="text-4xl font-black leading-none text-[color-mix(in_oklab,var(--orange),white_10%)] tabular-nums">
+                        {hotOddsPct === null ? "—" : `${hotOddsPct}%`}
+                      </div>
+                      <div className="mt-1 text-xs font-semibold text-[var(--muted)] tabular-nums">
+                        {hotRemaining}/{bitesRemaining} remaining
+                      </div>
+                    </div>
+                  </div>
+
+                  <div className="h-2 w-full overflow-hidden rounded-full bg-white/8">
+                    <div
+                      className="h-full rounded-full"
+                      style={{
+                        width: `${hotOddsPct ?? 0}%`,
+                        background:
+                          "linear-gradient(90deg,var(--green),var(--orange),var(--red),var(--yellow))",
+                      }}
+                      aria-hidden="true"
+                    />
+                  </div>
+
+                  <div className="text-xs text-[var(--muted)]">
+                    Updates after each “Mediocre / Bombay Burner” confirmation.
+                  </div>
+                </div>
+              </NeonCard>
+
+              <div className="rounded-2xl border border-white/10 bg-white/5 p-4">
+                <div className="text-xs font-black tracking-widest text-[var(--muted)]">
+                  WHAT YOU PLAY FOR
+                </div>
+                <div className="mt-2 text-sm font-black">
+                  {game.wager ? wagerLabel(game.wager) : "Waiting for host…"}
+                </div>
+                <div className="mt-1 text-sm text-[var(--muted)]">
+                  {game.wager ? wagerDescription(game.wager) : "Host chooses the wager before the first bite."}
+                </div>
+              </div>
+
               {game.declaredSpicy && !isEater ? (
                 <div className="rounded-2xl border border-[color-mix(in_oklab,var(--red),transparent_15%)] bg-[color-mix(in_oklab,var(--red),transparent_86%)] p-4 text-sm font-black text-[color-mix(in_oklab,var(--red),white_10%)]">
                   HOT declared — watch for facial expressions.
@@ -234,7 +295,7 @@ export default function MultiplayerRoomPage() {
 
               {game.phase === "guess" ? (
                 <div className="flex flex-col gap-3">
-                  <div className="text-sm font-black">Guess: spicy or mild?</div>
+                  <div className="text-sm font-black">Guess: Bombay Burner or Mediocre?</div>
                   <div className="grid grid-cols-2 gap-3">
                     <Button
                       size="lg"
@@ -242,14 +303,14 @@ export default function MultiplayerRoomPage() {
                       onClick={() => room.dispatch({ a: "guess", guess: "stark" })}
                       disabled={!!myGuess}
                     >
-                      🌶️ Stark
+                      🌶️ Bombay Burner
                     </Button>
                     <Button
                       size="lg"
                       onClick={() => room.dispatch({ a: "guess", guess: "mesig" })}
                       disabled={!!myGuess}
                     >
-                      ✓ Mesig
+                      ✓ Mediocre
                     </Button>
                   </div>
                   <div className="text-xs text-[var(--muted)]">
@@ -287,31 +348,38 @@ export default function MultiplayerRoomPage() {
                     </div>
                   </div>
 
-                  <div className="grid grid-cols-1 gap-3 sm:grid-cols-3">
-                    <Button
-                      size="lg"
-                      variant="secondary"
-                      onClick={() => room.dispatch({ a: "declare_spicy" })}
-                      disabled={!isEater || game.declaredSpicy}
-                    >
-                      HOT! 🔥
-                    </Button>
-                    <Button
-                      size="lg"
-                      onClick={() => room.dispatch({ a: "finish_eat" })}
-                      disabled={!isEater}
-                    >
-                      I ate it
-                    </Button>
-                    <Button
-                      size="lg"
-                      variant="danger"
-                      onClick={() => room.dispatch({ a: "panic" })}
-                      disabled={!isEater}
-                    >
-                      PANIC
-                    </Button>
-                  </div>
+                  {isEater ? (
+                    <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
+                      <Button size="lg" onClick={() => room.dispatch({ a: "finish_eat" })}>
+                        I ate it
+                      </Button>
+                      <Button size="lg" variant="danger" onClick={() => room.dispatch({ a: "panic" })}>
+                        I give up (DRINK)
+                      </Button>
+                    </div>
+                  ) : (
+                    <div className="flex flex-col gap-3">
+                      <div className="text-sm font-black">Watch the eater</div>
+                      <div className="text-xs text-[var(--muted)]">
+                        If you see a grimace, hit the button. When 2+ people press it, it counts as a flinch.
+                      </div>
+                      <Button
+                        size="lg"
+                        variant="danger"
+                        onClick={() => room.dispatch({ a: "judge_vote", vote: "yes" })}
+                        disabled={!!game.judgeVotes[room.self.id]}
+                      >
+                        YOU FLINCHED
+                      </Button>
+                      <div className="text-xs text-[var(--muted)]">
+                        Votes:{" "}
+                        {order
+                          .filter((pid) => pid !== currentPlayerId)
+                          .map((pid) => (game.judgeVotes[pid] ? "✓" : "—"))
+                          .join(" ")}
+                      </div>
+                    </div>
+                  )}
 
                   <Button
                     variant="ghost"
@@ -329,14 +397,17 @@ export default function MultiplayerRoomPage() {
 
               {game.phase === "confirm" ? (
                 <div className="flex flex-col gap-3">
-                  <div className="text-sm font-black">Was it HOT or not HOT?</div>
+                  <div className="text-sm font-black">What was it?</div>
+                  <div className="text-xs text-[var(--muted)]">
+                    This updates the board live and the odds of drawing a hot bite.
+                  </div>
                   <div className="grid grid-cols-2 gap-3">
                     <Button
                       size="lg"
                       onClick={() => room.dispatch({ a: "confirm_bite", biteType: "mild" })}
                       disabled={!isEater}
                     >
-                      😊 Not HOT
+                      ✓ Mediocre
                     </Button>
                     <Button
                       size="lg"
@@ -344,7 +415,7 @@ export default function MultiplayerRoomPage() {
                       onClick={() => room.dispatch({ a: "confirm_bite", biteType: "hot" })}
                       disabled={!isEater}
                     >
-                      🌶️ Hot
+                      🌶️ Bombay Burner
                     </Button>
                   </div>
                 </div>

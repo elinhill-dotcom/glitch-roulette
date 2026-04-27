@@ -1,0 +1,22 @@
+rules_version = '2';
+service cloud.firestore {
+  match /databases/{database}/documents {
+    // NOTE: These rules are intentionally permissive to get online multiplayer working fast.
+    // Tighten them for production (e.g. require auth, validate shapes, rate-limit writes).
+
+    // Online multiplayer room state + action queue
+    match /spicyRooms/{roomCode} {
+      allow read, write: if true;
+
+      match /actions/{actionId} {
+        allow read, write: if true;
+      }
+    }
+
+    // Session snapshots (admin dashboard)
+    match /spicySessions/{sessionId} {
+      allow read, write: if true;
+    }
+  }
+}
+
