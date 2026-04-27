@@ -162,7 +162,9 @@ export default function ResultsPage() {
             </div>
             <Button
               onClick={() => {
-                const msg = `🌶️ I played "Not a Flinch" on Flinch Roulette! ${winner.name} won 🏆${loser ? ` — ${loser.name} lost 😭` : ""} #NotAFlinch #SpiceChallenge #FlinchRoulette`;
+                const winnerName = winner?.name ?? "Someone";
+                const loserName = loser?.name;
+                const msg = `🌶️ I played "Not a Flinch" on Flinch Roulette! ${winnerName} won 🏆${loserName ? ` — ${loserName} lost 😭` : ""} #NotAFlinch #SpiceChallenge #FlinchRoulette`;
                 navigator.clipboard.writeText(msg);
               }}
             >

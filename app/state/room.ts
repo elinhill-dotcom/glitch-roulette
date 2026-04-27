@@ -125,7 +125,10 @@ function applyHostAction(
   const voters = state.playerOrder.filter((pid) => pid !== currentPlayerId);
   const flinchByVotes = (judgeVotes: Record<string, JudgeVote>) => {
     const yes = voters.filter((pid) => judgeVotes[pid] === "yes").length;
-    return yes >= 2;
+    // With only 2 players there is 1 voter, so threshold must be 1.
+    // With 3+ players, require 2 votes to avoid "single spectator decides" flinches.
+    const threshold = voters.length <= 1 ? 1 : 2;
+    return yes >= threshold;
   };
 
   switch (action.a) {
@@ -557,7 +560,8 @@ function useRoomFirestore(roomCode: string, name: string, isHostHint?: boolean):
         if (cur.phase !== "eat") return;
         const voters = cur.playerOrder.filter((pid) => pid !== cur.playerOrder[cur.currentPlayerIndex]);
         const yes = voters.filter((pid) => cur.judgeVotes[pid] === "yes").length;
-        const verdictGlitch = yes >= 2;
+        const threshold = voters.length <= 1 ? 1 : 2;
+        const verdictGlitch = yes >= threshold;
         const next: NotAGlitchState = {
           ...cur,
           phase: "confirm",
@@ -838,7 +842,8 @@ function useRoomLocal(roomCode: string, name: string, isHostHint?: boolean): Roo
           if (cur.phase !== "eat") return cur;
           const voters = cur.playerOrder.filter((pid) => pid !== cur.playerOrder[cur.currentPlayerIndex]);
           const yes = voters.filter((pid) => cur.judgeVotes[pid] === "yes").length;
-          const verdictGlitch = yes >= 2;
+          const threshold = voters.length <= 1 ? 1 : 2;
+          const verdictGlitch = yes >= threshold;
           const next: NotAGlitchState = {
             ...cur,
             phase: "confirm",
