@@ -135,7 +135,7 @@ export const PRODUCTS: MenuProduct[] = [
     priceCents: 1999,
     heat: 0,
     isAvailable: true,
-    image: "/menu/mozzarella-sticks.png",
+    image: "/hero/no-flinch-product.png",
   },
   {
     id: "d1",
