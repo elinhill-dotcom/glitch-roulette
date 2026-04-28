@@ -140,7 +140,7 @@ function applyHostAction(
         phase: "wager",
         hostId: actorId,
         betAmountCents: 0,
-        wager: undefined,
+        wager: null,
         playerOrder: order,
         currentPlayerIndex: startIdx === -1 ? 0 : startIdx,
         biteIndex: 0,
@@ -148,9 +148,11 @@ function applyHostAction(
         declaredSpicy: false,
         guesses: {},
         judgeVotes: {},
-        judgeVerdict: undefined,
+        judgeVerdict: null,
         protocol: makeInitialProtocol(),
         scores,
+        countdownEndsAt: null,
+        eatEndsAt: null,
       };
     }
     case "set_wager": {
@@ -201,9 +203,9 @@ function applyHostAction(
         declaredSpicy: false,
         guesses: {},
         judgeVotes: {},
-        judgeVerdict: undefined,
-        countdownEndsAt: undefined,
-        eatEndsAt: undefined,
+        judgeVerdict: null,
+        countdownEndsAt: null,
+        eatEndsAt: null,
       };
       const last = state.biteIndex >= 11;
       if (last) return { ...nextState, phase: "finished" };
@@ -221,7 +223,7 @@ function applyHostAction(
       return {
         ...state,
         phase: "confirm",
-        eatEndsAt: undefined,
+        eatEndsAt: null,
         judgeVerdict: verdictGlitch ? "glitch" : "safe",
       };
     }
@@ -276,9 +278,9 @@ function applyHostAction(
         declaredSpicy: false,
         guesses: {},
         judgeVotes: {},
-        judgeVerdict: undefined,
-        countdownEndsAt: undefined,
-        eatEndsAt: undefined,
+        judgeVerdict: null,
+        countdownEndsAt: null,
+        eatEndsAt: null,
       };
 
       const last = state.biteIndex >= 11;
@@ -304,7 +306,7 @@ function applyHostAction(
           judgeVotes,
           judgeVerdict: "glitch",
           phase: "confirm",
-          eatEndsAt: undefined,
+          eatEndsAt: null,
         };
       }
 
@@ -323,7 +325,7 @@ function applyHostAction(
         phase: "lobby",
         hostId: state.hostId,
         betAmountCents: state.betAmountCents,
-        wager: undefined,
+        wager: null,
         playerOrder: state.playerOrder,
         currentPlayerIndex: 0,
         biteIndex: 0,
@@ -331,9 +333,11 @@ function applyHostAction(
         declaredSpicy: false,
         guesses: {},
         judgeVotes: {},
-        judgeVerdict: undefined,
+        judgeVerdict: null,
         protocol: makeInitialProtocol(),
         scores: {},
+        countdownEndsAt: null,
+        eatEndsAt: null,
       };
     }
   }
@@ -445,7 +449,7 @@ function useRoomFirestore(roomCode: string, name: string, isHostHint?: boolean):
               phase: "lobby",
               hostId: currentHost ?? defaultHost,
               betAmountCents: 0,
-              wager: undefined,
+              wager: null,
               playerOrder: sortedPlayers.map((p) => p.id),
               currentPlayerIndex: 0,
               biteIndex: 0,
@@ -453,9 +457,11 @@ function useRoomFirestore(roomCode: string, name: string, isHostHint?: boolean):
               declaredSpicy: false,
               guesses: {},
               judgeVotes: {},
-              judgeVerdict: undefined,
+              judgeVerdict: null,
               protocol: makeInitialProtocol(),
               scores: {},
+              countdownEndsAt: null,
+              eatEndsAt: null,
             };
           }
 
@@ -545,7 +551,7 @@ function useRoomFirestore(roomCode: string, name: string, isHostHint?: boolean):
         const next: NotAGlitchState = {
           ...cur,
           phase: "eat",
-          countdownEndsAt: undefined,
+          countdownEndsAt: null,
           eatEndsAt: now + 30000,
         };
         void updateDoc(roomRef, { game: next, lastActiveAt: Date.now() }).catch(() => {});
@@ -566,7 +572,7 @@ function useRoomFirestore(roomCode: string, name: string, isHostHint?: boolean):
         const next: NotAGlitchState = {
           ...cur,
           phase: "confirm",
-          eatEndsAt: undefined,
+          eatEndsAt: null,
           judgeVerdict: verdictGlitch ? "glitch" : "safe",
         };
         void updateDoc(roomRef, { game: next, lastActiveAt: Date.now() }).catch(() => {});
@@ -709,7 +715,7 @@ function useRoomLocal(roomCode: string, name: string, isHostHint?: boolean): Roo
               phase: "lobby",
               hostId: defaultHost,
               betAmountCents: 0,
-              wager: undefined,
+              wager: null,
               playerOrder: currentPlayers.map((p) => p.id),
               currentPlayerIndex: 0,
               biteIndex: 0,
@@ -717,8 +723,11 @@ function useRoomLocal(roomCode: string, name: string, isHostHint?: boolean): Roo
               declaredSpicy: false,
               guesses: {},
               judgeVotes: {},
+              judgeVerdict: null,
               protocol: makeInitialProtocol(),
               scores: {},
+              countdownEndsAt: null,
+              eatEndsAt: null,
             } satisfies NotAGlitchState);
 
           const sorted = sortedPlayers;
@@ -769,7 +778,7 @@ function useRoomLocal(roomCode: string, name: string, isHostHint?: boolean): Roo
           phase: "lobby",
           hostId: self.id,
           betAmountCents: 0,
-          wager: undefined,
+          wager: null,
           playerOrder: order,
           currentPlayerIndex: 0,
           biteIndex: 0,
@@ -777,9 +786,11 @@ function useRoomLocal(roomCode: string, name: string, isHostHint?: boolean): Roo
           declaredSpicy: false,
           guesses: {},
           judgeVotes: {},
-          judgeVerdict: undefined,
+          judgeVerdict: null,
           protocol: makeInitialProtocol(),
           scores: {},
+          countdownEndsAt: null,
+          eatEndsAt: null,
         };
         channelRef.current?.postMessage({ t: "state", state: next } satisfies Msg);
         return next;
@@ -826,7 +837,7 @@ function useRoomLocal(roomCode: string, name: string, isHostHint?: boolean): Roo
           if (!cur || cur.hostId !== self.id) return cur;
           if (cur.phase !== "countdown") return cur;
           const now = Date.now();
-          const next: NotAGlitchState = { ...cur, phase: "eat", countdownEndsAt: undefined, eatEndsAt: now + 30000 };
+          const next: NotAGlitchState = { ...cur, phase: "eat", countdownEndsAt: null, eatEndsAt: now + 30000 };
           channelRef.current?.postMessage({ t: "state", state: next } satisfies Msg);
           return next;
         });
@@ -846,7 +857,7 @@ function useRoomLocal(roomCode: string, name: string, isHostHint?: boolean): Roo
           const next: NotAGlitchState = {
             ...cur,
             phase: "confirm",
-            eatEndsAt: undefined,
+            eatEndsAt: null,
             judgeVerdict: verdictGlitch ? "glitch" : "safe",
           };
           channelRef.current?.postMessage({ t: "state", state: next } satisfies Msg);

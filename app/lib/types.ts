@@ -70,7 +70,7 @@ export type NotAGlitchState = {
   phase: NotAGlitchPhase;
   hostId: string;
   betAmountCents: number;
-  wager?: WagerType;
+  wager: WagerType | null;
   playerOrder: string[]; // array of playerIds
   currentPlayerIndex: number;
   biteIndex: number; // 0..11
@@ -78,10 +78,10 @@ export type NotAGlitchState = {
   declaredSpicy: boolean;
   guesses: Record<string, Guess>; // playerId -> guess for current bite
   judgeVotes: Record<string, JudgeVote>; // playerId -> vote for current player
-  judgeVerdict?: "safe" | "glitch";
+  judgeVerdict: "safe" | "glitch" | null;
   protocol: ProtocolEntry[]; // 12 entries
   scores: Record<string, PlayerScore>; // playerId -> score
-  countdownEndsAt?: number; // ms epoch
-  eatEndsAt?: number; // ms epoch
+  countdownEndsAt: number | null; // ms epoch
+  eatEndsAt: number | null; // ms epoch
 };
 
