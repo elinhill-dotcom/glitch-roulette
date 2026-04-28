@@ -35,15 +35,39 @@ export default function ResultsPage() {
     return Object.values(game.scores).some((s) => s.glitched > 0);
   }, [game]);
 
+  const burnedByPlayerId = React.useMemo(() => {
+    const map = new Map<string, number>();
+    if (!game) return map;
+    for (const e of game.protocol ?? []) {
+      if (!e.playerId) continue;
+      const burned = (e.status === "panic" || e.status === "glitch") && e.heat === "hot";
+      if (!burned) continue;
+      map.set(e.playerId, (map.get(e.playerId) ?? 0) + 1);
+    }
+    return map;
+  }, [game]);
+
+  const anyBurned = React.useMemo(() => {
+    if (!game) return false;
+    return Array.from(burnedByPlayerId.values()).some((n) => n > 0);
+  }, [burnedByPlayerId, game]);
+
   const winner = React.useMemo(() => {
     if (!game) return null;
     const order = game.playerOrder;
     if (order.length === 0) return null;
-    let bestId = order[0]!;
-    for (const id of order.slice(1)) {
+    // If anyone got burned (flinch + hot), they are out of contention for winning.
+    const candidates = order.filter((id) => (burnedByPlayerId.get(id) ?? 0) === 0);
+    const pool = candidates.length ? candidates : order;
+    let bestId = pool[0]!;
+    for (const id of pool.slice(1)) {
       const a = game.scores[bestId] ?? { safe: 0, glitched: 0, betPoints: 0 };
       const b = game.scores[id] ?? { safe: 0, glitched: 0, betPoints: 0 };
-      if (anyGlitched) {
+      if (anyBurned) {
+        // Winner among non-burned: betting points decide (tie-break by fewer flinches).
+        if (b.betPoints > a.betPoints) bestId = id;
+        else if (b.betPoints === a.betPoints && b.glitched < a.glitched) bestId = id;
+      } else if (anyGlitched) {
         // fewer glitches wins, tie-break by betting points
         if (b.glitched < a.glitched) bestId = id;
         else if (b.glitched === a.glitched && b.betPoints > a.betPoints) bestId = id;
@@ -53,12 +77,29 @@ export default function ResultsPage() {
       }
     }
     return players.find((p) => p.id === bestId) ?? null;
-  }, [anyGlitched, game, players]);
+  }, [anyBurned, anyGlitched, burnedByPlayerId, game, players]);
 
   const loser = React.useMemo(() => {
     if (!game) return null;
     const order = game.playerOrder;
     if (order.length === 0) return null;
+    if (anyBurned) {
+      // "If you flinch you lose" becomes decisive when it's a HOT bite: burned players lose.
+      // If multiple are burned, betting decides who loses (lowest betPoints loses).
+      const burned = order.filter((id) => (burnedByPlayerId.get(id) ?? 0) > 0);
+      if (burned.length === 0) return null;
+      let worstId = burned[0]!;
+      for (const id of burned.slice(1)) {
+        const aBurn = burnedByPlayerId.get(worstId) ?? 0;
+        const bBurn = burnedByPlayerId.get(id) ?? 0;
+        const a = game.scores[worstId] ?? { safe: 0, glitched: 0, betPoints: 0 };
+        const b = game.scores[id] ?? { safe: 0, glitched: 0, betPoints: 0 };
+        if (bBurn > aBurn) worstId = id;
+        else if (bBurn === aBurn && b.betPoints < a.betPoints) worstId = id;
+      }
+      return players.find((p) => p.id === worstId) ?? null;
+    }
+
     let worstId = order[0]!;
     for (const id of order.slice(1)) {
       const a = game.scores[worstId] ?? { safe: 0, glitched: 0, betPoints: 0 };
@@ -73,7 +114,7 @@ export default function ResultsPage() {
       }
     }
     return players.find((p) => p.id === worstId) ?? null;
-  }, [anyGlitched, game, players]);
+  }, [anyBurned, anyGlitched, burnedByPlayerId, game, players]);
 
   const done = game?.phase === "finished";
 
@@ -91,13 +132,13 @@ export default function ResultsPage() {
           </div>
           <div className="text-2xl font-black tracking-tight sm:text-3xl">Scoreboard</div>
           <div className="text-sm text-[var(--muted)]">
-            If anyone flinched: winner is the one who flinched the least. Otherwise: betting points decide.
+            If someone gets burned (flinch + Bombay Burner): they lose. If multiple burn: betting decides.
           </div>
           <div className="flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between">
             <div className="flex items-center gap-2">
               <Badge tone="neutral">{room.players.length} players</Badge>
               {!done ? <Badge tone="neutral">In progress</Badge> : <Badge tone="green">Complete</Badge>}
-              {anyGlitched ? <Badge tone="red">Flinch scoring</Badge> : <Badge tone="green">Betting scoring</Badge>}
+              {anyBurned ? <Badge tone="red">Burned rule</Badge> : anyGlitched ? <Badge tone="red">Flinch scoring</Badge> : <Badge tone="green">Betting scoring</Badge>}
             </div>
             <div className="flex items-center gap-2">
               <Link href={`/game/room/${code}?name=${encodeURIComponent(room.self.name)}`}>
@@ -123,6 +164,9 @@ export default function ResultsPage() {
           rows
             .slice()
             .sort((a, b) => {
+              const aBurn = burnedByPlayerId.get(a.p.id) ?? 0;
+              const bBurn = burnedByPlayerId.get(b.p.id) ?? 0;
+              if (aBurn !== bBurn) return aBurn - bBurn; // non-burned first
               if (anyGlitched) return a.s.glitched - b.s.glitched;
               return b.s.betPoints - a.s.betPoints;
             })
@@ -134,16 +178,21 @@ export default function ResultsPage() {
                     #{idx + 1} {x.p.name}
                   </div>
                   <div className="mt-1 text-xs text-[var(--muted)]">
-                    ✓ {x.s.safe} safe • ✕ {x.s.glitched} flinched • 🎯 {x.s.betPoints} betting
+                    ✓ {x.s.safe} safe • ✕ {x.s.glitched} flinched • ☠ {burnedByPlayerId.get(x.p.id) ?? 0} burned • 🎯 {x.s.betPoints} betting
                   </div>
                 </div>
-                <Badge tone={anyGlitched ? (x.s.glitched === 0 ? "green" : "red") : "orange"}>
-                  {anyGlitched ? `${x.s.glitched}` : `${x.s.betPoints}`}
+                <Badge tone={(burnedByPlayerId.get(x.p.id) ?? 0) > 0 ? "red" : "neutral"}>
+                  {(burnedByPlayerId.get(x.p.id) ?? 0) > 0 ? "BURNED" : "OK"}
                 </Badge>
               </div>
               {winner?.id === x.p.id ? (
                 <div className="mt-3 rounded-2xl border border-[color-mix(in_oklab,var(--yellow),transparent_35%)] bg-[color-mix(in_oklab,var(--yellow),transparent_86%)] p-4 text-sm font-black text-[color-mix(in_oklab,var(--yellow),black_20%)]">
                   🏆 Winner
+                </div>
+              ) : null}
+              {loser?.id === x.p.id ? (
+                <div className="mt-3 rounded-2xl border border-[color-mix(in_oklab,var(--red),transparent_25%)] bg-[color-mix(in_oklab,var(--red),transparent_88%)] p-4 text-sm font-black text-[color-mix(in_oklab,var(--red),white_10%)]">
+                  ☠ Lost
                 </div>
               ) : null}
             </NeonCard>

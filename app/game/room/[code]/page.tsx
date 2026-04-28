@@ -57,25 +57,24 @@ export default function MultiplayerRoomPage() {
   const secsLeft = game?.eatEndsAt ? Math.max(0, Math.ceil((game.eatEndsAt - now) / 1000)) : null;
 
   const protocol = game?.protocol ?? [];
-  const protocolTone = (status: string) => {
-    if (status === "safe")
-      return "border-[color-mix(in_oklab,var(--green),transparent_35%)] bg-[color-mix(in_oklab,var(--green),transparent_88%)]";
-    if (status === "declared_spicy")
-      return "border-[color-mix(in_oklab,var(--orange),transparent_25%)] bg-[color-mix(in_oklab,var(--orange),transparent_88%)]";
-    if (status === "panic" || status === "glitch")
+  const protocolTone = (e: { status: string; heat?: "mild" | "hot" }) => {
+    // IMPORTANT: tile color represents heat ONLY (set at confirmation), not flinch.
+    if (e.heat === "hot")
       return "border-[color-mix(in_oklab,var(--red),transparent_20%)] bg-[color-mix(in_oklab,var(--red),transparent_88%)]";
+    if (e.heat === "mild")
+      return "border-[color-mix(in_oklab,var(--green),transparent_35%)] bg-[color-mix(in_oklab,var(--green),transparent_88%)]";
+    if (e.status === "declared_spicy")
+      return "border-[color-mix(in_oklab,var(--orange),transparent_25%)] bg-[color-mix(in_oklab,var(--orange),transparent_90%)]";
     return "border-white/12 bg-[color-mix(in_oklab,var(--card2),white_3%)]";
   };
 
-  const TileIcon = ({ status }: { status: string }) => {
-    if (status === "safe") return <span className="text-[color-mix(in_oklab,var(--green),white_8%)]">✓</span>;
-    if (status === "declared_spicy") return <span className="text-[color-mix(in_oklab,var(--orange),white_10%)]">🔥</span>;
-    if (status === "panic" || status === "glitch") return <span className="text-[color-mix(in_oklab,var(--red),white_10%)]">✕</span>;
-    return (
-      <span className="text-white/35" aria-hidden="true">
-        🍴
-      </span>
-    );
+  const TileIcon = ({ e }: { e: { status: string; heat?: "mild" | "hot" } }) => {
+    const burned = (e.status === "panic" || e.status === "glitch") && e.heat === "hot";
+    if (burned) return <span className="text-[color-mix(in_oklab,var(--red),white_12%)]">☠</span>;
+    if (e.heat === "hot") return <span className="text-[color-mix(in_oklab,var(--red),white_12%)]">🌶️</span>;
+    if (e.heat === "mild") return <span className="text-[color-mix(in_oklab,var(--green),white_12%)]">✓</span>;
+    if (e.status === "declared_spicy") return <span className="text-[color-mix(in_oklab,var(--orange),white_10%)]">🔥</span>;
+    return <span className="text-white/35">🍴</span>;
   };
 
   return (
@@ -102,7 +101,9 @@ export default function MultiplayerRoomPage() {
               </div>
             </div>
           ) : null}
-          <div className="text-2xl font-black tracking-tight sm:text-3xl">Not a Glitch</div>
+          <div className="text-2xl font-black tracking-tight sm:text-3xl">
+            Not a Flinch! <span className="text-white/70">Do you have what it takes?</span>
+          </div>
           <div className="text-sm text-[var(--muted)]">
             12 bites. 2 are extra spicy. Guess first. Eat fast. Survive the protocol.
           </div>
@@ -220,7 +221,7 @@ export default function MultiplayerRoomPage() {
                   <div className="mt-1 text-xs text-[var(--muted)]">
                     Bite {game.biteIndex + 1}/12 •{" "}
                     <span className="font-black text-white">{currentPlayer?.name ?? "—"}</span>{" "}
-                    eats now
+                    is up
                   </div>
                 </div>
                 <div className="flex items-center gap-2">
@@ -228,6 +229,16 @@ export default function MultiplayerRoomPage() {
                   <Badge tone={hotRemaining === 0 ? "neutral" : "orange"}>
                     {hotRemaining} HOT remaining
                   </Badge>
+                </div>
+              </div>
+
+              <div className="rounded-2xl border border-white/10 bg-white/5 p-4">
+                <div className="text-xs font-black tracking-widest text-[var(--muted)]">NOW EATING</div>
+                <div className="mt-2 flex items-center justify-between gap-3">
+                  <div className="min-w-0 text-lg font-black truncate">
+                    {currentPlayer?.name ?? "—"}
+                  </div>
+                  <Badge tone={isEater ? "orange" : "neutral"}>{isEater ? "YOU" : "WATCH"}</Badge>
                 </div>
               </div>
 
@@ -295,18 +306,22 @@ export default function MultiplayerRoomPage() {
 
               <div className="grid grid-cols-6 gap-2 sm:grid-cols-12">
                 {protocol.map((e) => (
-                  <div
-                    key={e.biteIndex}
-                    className={cn(
-                      "aspect-square rounded-2xl border grid place-items-center text-base font-black shadow-[inset_0_1px_0_rgba(255,255,255,0.10)]",
-                      protocolTone(e.status),
-                      e.biteIndex === game.biteIndex
-                        ? "ring-2 ring-[color-mix(in_oklab,var(--yellow),white_10%)]"
-                        : "",
-                    )}
-                    title={e.playerName ? `${e.playerName}: ${e.status}` : e.status}
-                  >
-                    <TileIcon status={e.status} />
+                  <div key={e.biteIndex} className="flex flex-col items-center gap-1">
+                    <div className="w-full text-[10px] font-black tracking-wide text-white/55 truncate text-center">
+                      {e.playerName ?? (e.biteIndex === game.biteIndex ? currentPlayer?.name ?? "—" : "—")}
+                    </div>
+                    <div
+                      className={cn(
+                        "w-full aspect-square rounded-2xl border grid place-items-center text-base font-black shadow-[inset_0_1px_0_rgba(255,255,255,0.10)]",
+                        protocolTone(e),
+                        e.biteIndex === game.biteIndex
+                          ? "ring-2 ring-[color-mix(in_oklab,var(--yellow),white_10%)]"
+                          : "",
+                      )}
+                      title={e.playerName ? `${e.playerName}: ${e.status}` : e.status}
+                    >
+                      <TileIcon e={e} />
+                    </div>
                   </div>
                 ))}
               </div>
@@ -479,7 +494,7 @@ export default function MultiplayerRoomPage() {
           <div className="flex items-end justify-between gap-3">
             <div>
               <div className="text-sm font-black tracking-wide">Scoreboard</div>
-              <div className="mt-1 text-xs text-[var(--muted)]">Safe • Glitched • Points</div>
+              <div className="mt-1 text-xs text-[var(--muted)]">Safe • Flinches • Burned • Points</div>
             </div>
             <div
               className="h-1 w-24 rounded-full"
@@ -492,16 +507,20 @@ export default function MultiplayerRoomPage() {
           </div>
 
           <div className="mt-4 rounded-2xl border border-white/10 bg-[color-mix(in_oklab,var(--card2),white_2%)]">
-            <div className="grid grid-cols-[1fr_auto_auto_auto] items-center gap-3 px-4 py-3 text-[11px] font-black tracking-widest text-[var(--muted)]">
+            <div className="grid grid-cols-[1fr_auto_auto_auto_auto] items-center gap-3 px-4 py-3 text-[11px] font-black tracking-widest text-[var(--muted)]">
               <div>PLAYER</div>
               <div className="text-right">SAFE</div>
               <div className="text-right">FLINCH</div>
+              <div className="text-right">BURNED</div>
               <div className="text-right">PTS</div>
             </div>
             <div className="h-px bg-white/10" />
 
             {room.players.slice(0, 4).map((p) => {
               const s = game?.scores[p.id] ?? { safe: 0, glitched: 0, betPoints: 0 };
+              const burned = (game?.protocol ?? []).filter(
+                (e) => e.playerId === p.id && (e.status === "panic" || e.status === "glitch") && e.heat === "hot",
+              ).length;
               const isNow =
                 p.id === currentPlayerId &&
                 game &&
@@ -510,7 +529,7 @@ export default function MultiplayerRoomPage() {
                 <div
                   key={p.id}
                   className={cn(
-                    "relative overflow-hidden grid grid-cols-[1fr_auto_auto_auto] items-center gap-3 px-4 py-3",
+                    "relative overflow-hidden grid grid-cols-[1fr_auto_auto_auto_auto] items-center gap-3 px-4 py-3",
                     "border-l-2",
                     isNow ? "border-l-[var(--yellow)] bg-white/6" : "border-l-transparent",
                   )}
@@ -550,6 +569,9 @@ export default function MultiplayerRoomPage() {
                   </div>
                   <div className="text-right text-sm font-black text-[color-mix(in_oklab,var(--red),white_8%)] tabular-nums">
                     {s.glitched}
+                  </div>
+                  <div className="text-right text-sm font-black text-[color-mix(in_oklab,var(--red),white_12%)] tabular-nums">
+                    {burned ? `☠ ${burned}` : "—"}
                   </div>
                   <div className="text-right text-sm font-black text-[color-mix(in_oklab,var(--orange),white_8%)] tabular-nums">
                     {s.betPoints}
