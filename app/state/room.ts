@@ -32,6 +32,32 @@ import {
   upsertSpicyRoomSnapshot,
 } from "../lib/spicyTelemetry";
 
+function normalizeGameState(state: NotAGlitchState): NotAGlitchState {
+  // Older Firestore docs may omit optional fields; normalize to nulls so writes never include undefined.
+  return {
+    ...state,
+    wager: state.wager ?? null,
+    judgeVerdict: state.judgeVerdict ?? null,
+    countdownEndsAt: state.countdownEndsAt ?? null,
+    eatEndsAt: state.eatEndsAt ?? null,
+  };
+}
+
+function stripUndefinedDeep<T>(value: T): T {
+  if (value === undefined) return value;
+  if (value === null) return value;
+  if (Array.isArray(value)) return value.map(stripUndefinedDeep) as T;
+  if (typeof value === "object") {
+    const out: Record<string, unknown> = {};
+    for (const [k, v] of Object.entries(value as Record<string, unknown>)) {
+      if (v === undefined) continue;
+      out[k] = stripUndefinedDeep(v);
+    }
+    return out as T;
+  }
+  return value;
+}
+
 type Msg =
   | { t: "who_is_here"; from: string }
   | { t: "i_am"; player: RoomPlayer }
@@ -118,6 +144,7 @@ function applyHostAction(
   actorId: string,
   action: RoomAction,
 ): NotAGlitchState {
+  state = normalizeGameState(state);
   const playerMap = new Map(players.map((p) => [p.id, p] as const));
   const currentPlayerId = state.playerOrder[state.currentPlayerIndex];
   const currentPlayer = currentPlayerId ? playerMap.get(currentPlayerId) : undefined;
@@ -421,7 +448,10 @@ function useRoomFirestore(roomCode: string, name: string, isHostHint?: boolean):
         const map = data?.players ?? {};
         const list = uniqPlayers(Object.values(map));
         setPlayers(list.length ? list : [self]);
-        setGame((data?.game as NotAGlitchState | null) ?? null);
+        setGame(() => {
+          const raw = (data?.game as NotAGlitchState | null) ?? null;
+          return raw ? normalizeGameState(raw) : null;
+        });
         setHostId((data?.hostId as string | null) ?? null);
       });
 
@@ -476,8 +506,9 @@ function useRoomFirestore(roomCode: string, name: string, isHostHint?: boolean):
             void deleteDoc(ch.doc.ref).catch(() => {});
           }
 
+          const safeNext = stripUndefinedDeep(normalizeGameState(next));
           void updateDoc(roomRef, {
-            game: next,
+            game: safeNext,
             hostId: currentHost,
             status: next.phase === "finished" ? "finished" : "open",
             lastActiveAt: Date.now(),
@@ -554,7 +585,7 @@ function useRoomFirestore(roomCode: string, name: string, isHostHint?: boolean):
           countdownEndsAt: null,
           eatEndsAt: now + 30000,
         };
-        void updateDoc(roomRef, { game: next, lastActiveAt: Date.now() }).catch(() => {});
+        void updateDoc(roomRef, { game: stripUndefinedDeep(normalizeGameState(next)), lastActiveAt: Date.now() }).catch(() => {});
       }, ms + 40);
       return () => window.clearTimeout(t);
     }
@@ -575,7 +606,7 @@ function useRoomFirestore(roomCode: string, name: string, isHostHint?: boolean):
           eatEndsAt: null,
           judgeVerdict: verdictGlitch ? "glitch" : "safe",
         };
-        void updateDoc(roomRef, { game: next, lastActiveAt: Date.now() }).catch(() => {});
+        void updateDoc(roomRef, { game: stripUndefinedDeep(normalizeGameState(next)), lastActiveAt: Date.now() }).catch(() => {});
       }, ms + 60);
       return () => window.clearTimeout(t);
     }
