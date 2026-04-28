@@ -10,6 +10,10 @@ import { CameraRecorder } from "../../../components/CameraRecorder";
 import { cn } from "../../../lib/utils";
 import { useRoom } from "../../../state/room";
 import { wagerDescription, wagerLabel } from "../../../lib/game";
+import {
+  ONLINE_MULTIPLAYER_AVAILABLE,
+  onlineMultiplayerDisabledReason,
+} from "../../../lib/multiplayerEnv";
 
 export default function MultiplayerRoomPage() {
   const params = useParams<{ code: string }>();
@@ -20,6 +24,9 @@ export default function MultiplayerRoomPage() {
   const modeParam = search.get("mode");
   // Multiplayer-first: default to online unless explicitly forced to local.
   const mode = modeParam === "local" ? "local" : "online";
+  const onlineRequested = mode === "online";
+  const disabledReason = onlineMultiplayerDisabledReason();
+  const onlineActive = onlineRequested && ONLINE_MULTIPLAYER_AVAILABLE;
 
   const room = useRoom(code, name, { isHostHint, mode });
   const game = room.game;
@@ -84,7 +91,17 @@ export default function MultiplayerRoomPage() {
             <Badge tone="orange">{code}</Badge>
             {!room.canMultiplayer ? <Badge tone="neutral">Single device</Badge> : null}
             {room.isHost ? <Badge tone="orange">HOST</Badge> : null}
+            {onlineActive ? <Badge tone="green">ONLINE MULTIPLAYER</Badge> : <Badge tone="neutral">LOCAL MODE</Badge>}
           </div>
+          {!onlineActive ? (
+            <div className="rounded-2xl border border-[color-mix(in_oklab,var(--yellow),transparent_35%)] bg-[color-mix(in_oklab,var(--yellow),transparent_88%)] p-4 text-sm">
+              <div className="font-black">Online multiplayer is not active.</div>
+              <div className="mt-1 text-[color-mix(in_oklab,var(--yellow),black_30%)]">
+                Players won’t see each other across networks unless Firestore is enabled.
+                {disabledReason ? ` ${disabledReason}.` : ""}
+              </div>
+            </div>
+          ) : null}
           <div className="text-2xl font-black tracking-tight sm:text-3xl">Not a Glitch</div>
           <div className="text-sm text-[var(--muted)]">
             12 bites. 2 are extra spicy. Guess first. Eat fast. Survive the protocol.
