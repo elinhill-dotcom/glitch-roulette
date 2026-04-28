@@ -9,8 +9,8 @@ export default function GameIntroPage() {
     <div className="flex flex-col gap-5">
       <NeonCard className="relative overflow-hidden p-6 sm:p-10" glow="orange">
         <Image
-          src="/hero/spicy-arena-fire.jpg"
-          alt="Spicy Arena background"
+          src="/hero/no-flinch-product.png"
+          alt="No Flinch game box"
           fill
           priority
           className="pointer-events-none object-cover"
@@ -29,28 +29,16 @@ export default function GameIntroPage() {
           aria-hidden="true"
         />
         <div className="relative flex flex-col gap-3">
-          <div className="w-full overflow-x-auto">
-            <div className="mx-auto w-fit">
-              <Image
-                src="/hero/flinch-rules.png"
-                alt="Flinch rules"
-                width={458}
-                height={155}
-                className="h-auto w-auto max-w-full"
-                sizes="(max-width: 768px) 100vw, 458px"
-                priority
-              />
-            </div>
-          </div>
           <div className="flex flex-wrap items-center gap-2">
             <Badge tone="orange">Spicy Challenge</Badge>
             <Badge tone="green">Multiplayer</Badge>
             <Badge tone="neutral">Scoreboard</Badge>
           </div>
-          <div className="text-2xl font-black tracking-tight sm:text-4xl">Spicy Arena</div>
+          <div className="text-2xl font-black tracking-tight sm:text-4xl">
+            No Flinch <span className="text-white/70">Chili Cheese</span>
+          </div>
           <div className="text-sm leading-6 text-[var(--muted)]">
-            Create a room, share the code, and spin. Everyone gets a random heat level and a dare.
-            The leaderboard crowns the boldest (or the luckiest).
+            12 one-bite appetizers. 2 are extremely spicy. Guess first, eat fast, and don't flinch.
           </div>
           <div className="mt-2 flex flex-col gap-3 sm:flex-row">
             <Link href="/game/create" className="w-full sm:w-auto">
@@ -65,8 +53,7 @@ export default function GameIntroPage() {
             </Link>
           </div>
           <div className="text-xs text-[var(--muted)]">
-            Multiplayer works instantly across tabs/windows on the same device via{" "}
-            <span className="font-semibold">BroadcastChannel</span>.
+            Share a room code to play together.
           </div>
         </div>
       </NeonCard>
