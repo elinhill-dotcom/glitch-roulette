@@ -5,12 +5,14 @@ import * as React from "react";
 import { Badge } from "../../components/ui/Badge";
 import { Button } from "../../components/ui/Button";
 import { NeonCard } from "../../components/ui/NeonCard";
+import { ONLINE_MULTIPLAYER_AVAILABLE, onlineMultiplayerDisabledReason } from "../../lib/multiplayerEnv";
 
 export default function JoinRoomPage() {
   const router = useRouter();
   const [code, setCode] = React.useState("");
   const [name, setName] = React.useState("Player");
   const [online, setOnline] = React.useState(false);
+  const disabledReason = onlineMultiplayerDisabledReason();
 
   const cleanCode = code.toUpperCase().replace(/[^A-Z0-9]/g, "").slice(0, 6);
 
@@ -61,12 +63,14 @@ export default function JoinRoomPage() {
               <div className="text-sm font-black">Online multiplayer</div>
               <div className="mt-1 text-xs text-[var(--muted)]">
                 Join across devices/networks (uses Firestore).
+                {disabledReason ? ` (${disabledReason})` : ""}
               </div>
             </div>
             <input
               type="checkbox"
               checked={online}
               onChange={(e) => setOnline(e.target.checked)}
+              disabled={!ONLINE_MULTIPLAYER_AVAILABLE}
               className="h-5 w-5 accent-[var(--green)]"
               aria-label="Enable online multiplayer"
             />

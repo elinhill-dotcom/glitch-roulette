@@ -25,6 +25,7 @@ import type {
 import { randomGlitchyBites } from "../lib/game";
 import { safeId } from "../lib/utils";
 import { getDb } from "../lib/firebase";
+import { ONLINE_MULTIPLAYER_AVAILABLE } from "../lib/multiplayerEnv";
 import {
   recordSpicySessionEnd,
   recordSpicySessionStart,
@@ -584,16 +585,14 @@ function useRoomFirestore(roomCode: string, name: string, isHostHint?: boolean):
   };
 }
 
-// Firestore rooms are opt-in: local multiplayer (BroadcastChannel) is the default dev experience.
-// This avoids "can't connect" screens when Firebase credentials, rules, or network access aren't available.
-const FIRESTORE_ENABLED_BY_ENV =
-  process.env.NEXT_PUBLIC_USE_FIRESTORE_ROOMS === "1" &&
-  Boolean(process.env.NEXT_PUBLIC_FIREBASE_PROJECT_ID) &&
-  Boolean(process.env.NEXT_PUBLIC_FIREBASE_API_KEY);
-
 export function useRoom(roomCode: string, name: string, options?: UseRoomOptions): RoomState {
-  const mode = options?.mode ?? (FIRESTORE_ENABLED_BY_ENV ? "online" : "local");
+  const mode = options?.mode ?? (ONLINE_MULTIPLAYER_AVAILABLE ? "online" : "local");
   const isHostHint = options?.isHostHint;
+  // Never crash the room page when online is requested but not configured.
+  // In that case we silently fall back to local mode.
+  if (mode === "online" && !ONLINE_MULTIPLAYER_AVAILABLE) {
+    return useRoomLocal(roomCode, name, isHostHint);
+  }
   return mode === "online" ? useRoomFirestore(roomCode, name, isHostHint) : useRoomLocal(roomCode, name, isHostHint);
 }
 
