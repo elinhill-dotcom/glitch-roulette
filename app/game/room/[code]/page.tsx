@@ -18,7 +18,8 @@ export default function MultiplayerRoomPage() {
   const name = search.get("name") ?? "Player";
   const isHostHint = search.get("host") === "1";
   const modeParam = search.get("mode");
-  const mode = modeParam === "online" ? "online" : "local";
+  // Multiplayer-first: default to online unless explicitly forced to local.
+  const mode = modeParam === "local" ? "local" : "online";
 
   const room = useRoom(code, name, { isHostHint, mode });
   const game = room.game;

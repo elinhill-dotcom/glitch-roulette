@@ -6,11 +6,12 @@ import { Badge } from "../../components/ui/Badge";
 import { Button } from "../../components/ui/Button";
 import { NeonCard } from "../../components/ui/NeonCard";
 import { randomRoomCode } from "../../lib/game";
+import { onlineMultiplayerDisabledReason } from "../../lib/multiplayerEnv";
 
 export default function CreateRoomPage() {
   const router = useRouter();
   const [name, setName] = React.useState("Host");
-  const [online, setOnline] = React.useState(false);
+  const disabledReason = onlineMultiplayerDisabledReason();
 
   return (
     <div className="mx-auto w-full max-w-xl">
@@ -40,28 +41,20 @@ export default function CreateRoomPage() {
             />
           </label>
 
-          <label className="flex items-center justify-between gap-3 rounded-2xl border border-white/10 bg-white/5 px-4 py-3">
-            <div className="min-w-0">
-              <div className="text-sm font-black">Online multiplayer</div>
-              <div className="mt-1 text-xs text-[var(--muted)]">
-                Play across devices/networks (uses Firestore).
-              </div>
+          <div className="rounded-2xl border border-white/10 bg-white/5 px-4 py-3">
+            <div className="text-sm font-black">Online multiplayer</div>
+            <div className="mt-1 text-xs text-[var(--muted)]">
+              Always on. Share the code and play across devices/networks (Firestore).
+              {disabledReason ? ` (${disabledReason})` : ""}
             </div>
-            <input
-              type="checkbox"
-              checked={online}
-              onChange={(e) => setOnline(e.target.checked)}
-              className="h-5 w-5 accent-[var(--orange)]"
-              aria-label="Enable online multiplayer"
-            />
-          </label>
+          </div>
 
           <Button
             size="lg"
             onClick={() => {
               const code = randomRoomCode();
               router.push(
-                `/game/room/${code}?name=${encodeURIComponent(name)}&host=1&mode=${online ? "online" : "local"}`,
+                `/game/room/${code}?name=${encodeURIComponent(name)}&host=1&mode=online`,
               );
             }}
           >

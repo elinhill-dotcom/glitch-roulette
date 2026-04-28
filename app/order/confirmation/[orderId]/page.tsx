@@ -113,7 +113,7 @@ export default function OrderConfirmationPage() {
                   onClick={async () => {
                     // Ensure the room exists in Firestore before sharing the code.
                     await ensureSpicyRoom({ code }).catch(() => {});
-                    router.push(`/game/room/${code}?name=${encodeURIComponent(hostName)}&host=1`);
+                    router.push(`/game/room/${code}?name=${encodeURIComponent(hostName)}&host=1&mode=online`);
                   }}
                 >
                   Open game room
