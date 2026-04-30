@@ -304,6 +304,122 @@ export default function MultiplayerRoomPage() {
                 </div>
               ) : null}
 
+              <div className="rounded-2xl border border-white/10 bg-white/5 p-4">
+                <div className="text-xs font-black tracking-widest text-[var(--muted)]">ACTION</div>
+
+                {game.phase === "guess" ? (
+                  <div className="mt-3 flex flex-col gap-3">
+                    <div className="text-sm font-black">Betting: Bombay Burner or Mediocre?</div>
+                    <div className="grid grid-cols-2 gap-3">
+                      <Button
+                        size="lg"
+                        variant="danger"
+                        onClick={() => room.dispatch({ a: "guess", guess: "stark" })}
+                        disabled={!!myGuess}
+                      >
+                        🌶️ Bombay Burner
+                      </Button>
+                      <Button
+                        size="lg"
+                        onClick={() => room.dispatch({ a: "guess", guess: "mesig" })}
+                        disabled={!!myGuess}
+                      >
+                        ✓ Mediocre
+                      </Button>
+                    </div>
+                    <div className="text-xs text-[var(--muted)]">
+                      {allGuessed ? "All bets are in. Countdown starting…" : "Everyone must place a bet."}
+                    </div>
+                  </div>
+                ) : null}
+
+                {game.phase === "countdown" ? (
+                  <div className="mt-3 rounded-2xl border border-white/10 bg-white/5 p-5 text-center">
+                    <div className="text-xs font-black tracking-widest text-[var(--muted)]">EATING IN</div>
+                    <div className="mt-2 text-5xl font-black text-[color-mix(in_oklab,var(--orange),white_10%)]">
+                      {Math.max(0, Math.ceil(((game.countdownEndsAt ?? 0) - now) / 1000))}
+                    </div>
+                  </div>
+                ) : null}
+
+                {game.phase === "eat" ? (
+                  <div className="mt-3 flex flex-col gap-3">
+                    <div className="rounded-2xl border border-white/10 bg-white/5 p-5 text-center">
+                      <div className="text-xs font-black tracking-widest text-[var(--muted)]">TIME LEFT</div>
+                      <div
+                        className={cn(
+                          "mt-2 text-5xl font-black",
+                          (secsLeft ?? 0) <= 5
+                            ? "text-[color-mix(in_oklab,var(--yellow),white_10%)]"
+                            : "text-[color-mix(in_oklab,var(--orange),white_10%)]",
+                        )}
+                      >
+                        {Math.max(0, Math.ceil(((game.eatEndsAt ?? 0) - now) / 1000))}
+                      </div>
+                    </div>
+
+                    {isEater ? (
+                      <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
+                        <Button size="lg" onClick={() => room.dispatch({ a: "finish_eat" })}>
+                          I ate it
+                        </Button>
+                        <Button size="lg" variant="danger" onClick={() => room.dispatch({ a: "panic" })}>
+                          I give up (DRINK)
+                        </Button>
+                      </div>
+                    ) : (
+                      <div className="flex flex-col gap-3">
+                        <div className="text-sm font-black">Spectators</div>
+                        <div className="text-xs text-[var(--muted)]">
+                          If you see a grimace, hit the button. When 2+ people press it, it counts as a flinch.
+                        </div>
+                        <Button
+                          size="lg"
+                          variant="danger"
+                          onClick={() => room.dispatch({ a: "judge_vote", vote: "yes" })}
+                          disabled={!!game.judgeVotes[room.self.id]}
+                        >
+                          YOU FLINCHED
+                        </Button>
+                        <div className="text-xs text-[var(--muted)]">
+                          Votes:{" "}
+                          {order
+                            .filter((pid) => pid !== currentPlayerId)
+                            .map((pid) => (game.judgeVotes[pid] ? "✓" : "—"))
+                            .join(" ")}
+                        </div>
+                      </div>
+                    )}
+                  </div>
+                ) : null}
+
+                {game.phase === "confirm" ? (
+                  <div className="mt-3 flex flex-col gap-3">
+                    <div className="text-sm font-black">After the bite: what was it?</div>
+                    <div className="text-xs text-[var(--muted)]">
+                      This updates the board and the live odds.
+                    </div>
+                    <div className="grid grid-cols-2 gap-3">
+                      <Button
+                        size="lg"
+                        onClick={() => room.dispatch({ a: "confirm_bite", biteType: "mild" })}
+                        disabled={!isEater}
+                      >
+                        ✓ Mediocre
+                      </Button>
+                      <Button
+                        size="lg"
+                        variant="danger"
+                        onClick={() => room.dispatch({ a: "confirm_bite", biteType: "hot" })}
+                        disabled={!isEater}
+                      >
+                        🌶️ Bombay Burner
+                      </Button>
+                    </div>
+                  </div>
+                ) : null}
+              </div>
+
               <div className="grid grid-cols-6 gap-2 sm:grid-cols-12">
                 {protocol.map((e) => (
                   <div key={e.biteIndex} className="flex flex-col items-center gap-1">
@@ -325,134 +441,6 @@ export default function MultiplayerRoomPage() {
                   </div>
                 ))}
               </div>
-
-              {game.phase === "guess" ? (
-                <div className="flex flex-col gap-3">
-                  <div className="text-sm font-black">Guess: Bombay Burner or Mediocre?</div>
-                  <div className="grid grid-cols-2 gap-3">
-                    <Button
-                      size="lg"
-                      variant="danger"
-                      onClick={() => room.dispatch({ a: "guess", guess: "stark" })}
-                      disabled={!!myGuess}
-                    >
-                      🌶️ Bombay Burner
-                    </Button>
-                    <Button
-                      size="lg"
-                      onClick={() => room.dispatch({ a: "guess", guess: "mesig" })}
-                      disabled={!!myGuess}
-                    >
-                      ✓ Mediocre
-                    </Button>
-                  </div>
-                  <div className="text-xs text-[var(--muted)]">
-                    {allGuessed ? "All guesses in. Countdown starting…" : "Everyone must guess."}
-                  </div>
-                </div>
-              ) : null}
-
-              {game.phase === "countdown" ? (
-                <div className="rounded-2xl border border-white/10 bg-white/5 p-5 text-center">
-                  <div className="text-xs font-black tracking-widest text-[var(--muted)]">
-                    EATING IN
-                  </div>
-                  <div className="mt-2 text-5xl font-black text-[color-mix(in_oklab,var(--orange),white_10%)]">
-                    {Math.max(0, Math.ceil(((game.countdownEndsAt ?? 0) - now) / 1000))}
-                  </div>
-                </div>
-              ) : null}
-
-              {game.phase === "eat" ? (
-                <div className="flex flex-col gap-3">
-                  <div className="rounded-2xl border border-white/10 bg-white/5 p-5 text-center">
-                    <div className="text-xs font-black tracking-widest text-[var(--muted)]">
-                      TIME LEFT
-                    </div>
-                    <div
-                      className={cn(
-                        "mt-2 text-5xl font-black",
-                        (secsLeft ?? 0) <= 5
-                          ? "text-[color-mix(in_oklab,var(--yellow),white_10%)]"
-                          : "text-[color-mix(in_oklab,var(--orange),white_10%)]",
-                      )}
-                    >
-                      {Math.max(0, Math.ceil(((game.eatEndsAt ?? 0) - now) / 1000))}
-                    </div>
-                  </div>
-
-                  {isEater ? (
-                    <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
-                      <Button size="lg" onClick={() => room.dispatch({ a: "finish_eat" })}>
-                        I ate it
-                      </Button>
-                      <Button size="lg" variant="danger" onClick={() => room.dispatch({ a: "panic" })}>
-                        I give up (DRINK)
-                      </Button>
-                    </div>
-                  ) : (
-                    <div className="flex flex-col gap-3">
-                      <div className="text-sm font-black">Watch the eater</div>
-                      <div className="text-xs text-[var(--muted)]">
-                        If you see a grimace, hit the button. When 2+ people press it, it counts as a flinch.
-                      </div>
-                      <Button
-                        size="lg"
-                        variant="danger"
-                        onClick={() => room.dispatch({ a: "judge_vote", vote: "yes" })}
-                        disabled={!!game.judgeVotes[room.self.id]}
-                      >
-                        YOU FLINCHED
-                      </Button>
-                      <div className="text-xs text-[var(--muted)]">
-                        Votes:{" "}
-                        {order
-                          .filter((pid) => pid !== currentPlayerId)
-                          .map((pid) => (game.judgeVotes[pid] ? "✓" : "—"))
-                          .join(" ")}
-                      </div>
-                    </div>
-                  )}
-
-                  <Button
-                    variant="ghost"
-                    onClick={() => setCameraOpen(true)}
-                    className="w-full"
-                  >
-                    Record with filter
-                  </Button>
-
-                  <div className="text-xs text-[var(--muted)]">
-                    Red/yellow only appears during spicy moments (declare/panic/glitch).
-                  </div>
-                </div>
-              ) : null}
-
-              {game.phase === "confirm" ? (
-                <div className="flex flex-col gap-3">
-                  <div className="text-sm font-black">What was it?</div>
-                  <div className="text-xs text-[var(--muted)]">
-                    This updates the board live and the odds of drawing a hot bite.
-                  </div>
-                  <div className="grid grid-cols-2 gap-3">
-                    <Button
-                      size="lg"
-                      onClick={() => room.dispatch({ a: "confirm_bite", biteType: "mild" })}
-                      disabled={!isEater}
-                    >
-                      ✓ Mediocre
-                    </Button>
-                    <Button
-                      size="lg"
-                      variant="danger"
-                      onClick={() => room.dispatch({ a: "confirm_bite", biteType: "hot" })}
-                      disabled={!isEater}
-                    >
-                      🌶️ Bombay Burner
-                    </Button>
-                  </div>
-                </div>
-              ) : null}
 
               {game.phase === "judge" ? (
                 <div className="flex flex-col gap-3">
@@ -532,6 +520,7 @@ export default function MultiplayerRoomPage() {
                     "relative overflow-hidden grid grid-cols-[1fr_auto_auto_auto_auto] items-center gap-3 px-4 py-3",
                     "border-l-2",
                     isNow ? "border-l-[var(--yellow)] bg-white/6" : "border-l-transparent",
+                    burned ? "ring-1 ring-[color-mix(in_oklab,var(--red),transparent_35%)]" : "",
                   )}
                 >
                   {isNow ? (
@@ -571,7 +560,17 @@ export default function MultiplayerRoomPage() {
                     {s.glitched}
                   </div>
                   <div className="text-right text-sm font-black text-[color-mix(in_oklab,var(--red),white_12%)] tabular-nums">
-                    {burned ? `☠ ${burned}` : "—"}
+                    {burned ? (
+                      <span className="inline-flex items-center gap-2">
+                        <span className="text-[color-mix(in_oklab,var(--red),white_12%)]">☠</span>
+                        <span>{burned}</span>
+                        <span className="hidden sm:inline text-[11px] font-black tracking-widest text-white/65">
+                          OUT
+                        </span>
+                      </span>
+                    ) : (
+                      "—"
+                    )}
                   </div>
                   <div className="text-right text-sm font-black text-[color-mix(in_oklab,var(--orange),white_8%)] tabular-nums">
                     {s.betPoints}
