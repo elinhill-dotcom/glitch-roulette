@@ -380,6 +380,23 @@ function MultiplayerRoomPageInner() {
           ) : (
             /* ============= ACTIVE MATCH ============= */
             <>
+              {/* WAGER BANNER — show this prominently so every player knows
+                  what they're playing for, especially when the host picks and
+                  the game jumps into countdown for everyone else. */}
+              {game.wager ? (
+                <div className="mb-3 rounded-2xl border border-[color-mix(in_oklab,var(--orange),transparent_45%)] bg-[color-mix(in_oklab,var(--orange),transparent_88%)] px-4 py-3">
+                  <div className="text-[10px] font-black uppercase tracking-[0.18em] text-[color-mix(in_oklab,var(--orange),white_10%)]">
+                    Playing for
+                  </div>
+                  <div className="mt-0.5 text-lg font-black leading-tight sm:text-xl">
+                    {wagerLabel(game.wager)}
+                  </div>
+                  <div className="mt-1 text-xs text-white/80">
+                    {wagerDescription(game.wager)}
+                  </div>
+                </div>
+              ) : null}
+
               {/* TURN — merged BITE header + YOUR ACTION so the most important
                   information sits at the top of the screen on mobile. */}
               <div>
@@ -391,9 +408,6 @@ function MultiplayerRoomPageInner() {
                   <span className="text-sm text-[var(--muted)]">is up</span>
                 </div>
                 <div className="mt-2 flex flex-wrap gap-1.5">
-                  {game.wager ? (
-                    <Badge tone="neutral">Wager: {wagerLabel(game.wager)}</Badge>
-                  ) : null}
                   <Badge tone={isEater ? "orange" : "neutral"}>
                     {isEater ? "YOU EAT" : "YOU WATCH"}
                   </Badge>

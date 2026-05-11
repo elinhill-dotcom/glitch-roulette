@@ -622,6 +622,29 @@ function useRoomFirestore(roomCode: string, name: string, isHostHint?: boolean):
     }
   }, [isHost, game, roomRef, self.id]);
 
+  // Safety net for legacy / stuck "confirm" phase — runs on EVERY client, not
+  // just the host. The reducer is deterministic so each client computes the
+  // same resolved state; Firestore handles the last-write-wins. This makes the
+  // game unstickable even if the host's tab is asleep or running old code that
+  // left the room in `phase: "confirm"`.
+  React.useEffect(() => {
+    if (!game) return;
+    if (game.phase !== "confirm") return;
+    const t = window.setTimeout(() => {
+      const cur = gameRef.current;
+      if (!cur || cur.phase !== "confirm") return;
+      const settled = applyHostAction(cur, playersRef.current, self.id, {
+        a: "confirm_bite",
+        biteType: "mild",
+      });
+      void updateDoc(roomRef, {
+        game: stripUndefinedDeep(normalizeGameState(settled)),
+        lastActiveAt: Date.now(),
+      }).catch(() => {});
+    }, 1200);
+    return () => window.clearTimeout(t);
+  }, [game, self.id, roomRef]);
+
   return {
     self,
     players,
@@ -892,6 +915,25 @@ function useRoomLocal(roomCode: string, name: string, isHostHint?: boolean): Roo
       }, ms + 40);
       return () => window.clearTimeout(t);
     }
+  }, [game, self.id]);
+
+  // Local-mode safety net for the legacy "confirm" phase. Same idea as the
+  // Firestore version above — auto-advance so the round never gets stuck.
+  React.useEffect(() => {
+    if (!game) return;
+    if (game.phase !== "confirm") return;
+    const t = window.setTimeout(() => {
+      setGame((cur) => {
+        if (!cur || cur.phase !== "confirm") return cur;
+        const settled = applyHostAction(cur, playersRef.current, self.id, {
+          a: "confirm_bite",
+          biteType: "mild",
+        });
+        channelRef.current?.postMessage({ t: "state", state: settled } satisfies Msg);
+        return settled;
+      });
+    }, 1200);
+    return () => window.clearTimeout(t);
   }, [game, self.id]);
 
   return { self, players, canMultiplayer, isHost, game, dispatch };
