@@ -17,6 +17,15 @@ service cloud.firestore {
     match /spicySessions/{sessionId} {
       allow read, write: if true;
     }
+
+    // Public Wall of Flinchers. Anyone can read, anyone can create a post
+    // (no auth required for the demo). Edits / deletes are blocked from the
+    // client — a future cron/admin script can prune.
+    match /wallOfFlinchers/{postId} {
+      allow read: if true;
+      allow create: if true;
+      allow update, delete: if false;
+    }
   }
 }
 
