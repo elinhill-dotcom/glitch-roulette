@@ -9,11 +9,10 @@ import {
   Timestamp,
   type Unsubscribe,
 } from "firebase/firestore";
-import { getDownloadURL, ref, uploadBytes } from "firebase/storage";
-import { getDb, getStorageBucket } from "./firebase";
+import { getDb } from "./firebase";
+import { getSupabase, WALL_BUCKET } from "./supabase";
 
 const WALL_COLLECTION = "wallOfFlinchers";
-const WALL_STORAGE_PREFIX = "wallOfFlinchers";
 
 export type WallPost = {
   id: string;
@@ -44,24 +43,36 @@ export async function uploadFlinchPhoto({
   playerName,
   roomCode,
 }: UploadInput): Promise<WallPost> {
-  const storage = getStorageBucket();
   const id = safeId("flinch");
   const ext = blob.type.includes("png") ? "png" : "jpg";
-  const path = `${WALL_STORAGE_PREFIX}/${id}.${ext}`;
-  const storageRef = ref(storage, path);
+  const path = `${id}.${ext}`;
+  const contentType = blob.type || "image/jpeg";
+
+  // 1) Upload the binary to Supabase Storage. The bucket is public so we can
+  //    grab a stable URL with getPublicUrl right away — no signed URL needed.
   let imageUrl: string;
   try {
-    await uploadBytes(storageRef, blob, {
-      contentType: blob.type || "image/jpeg",
-      customMetadata: { playerName, roomCode: roomCode ?? "" },
-    });
-    imageUrl = await getDownloadURL(storageRef);
+    const supabase = getSupabase();
+    const { error: uploadError } = await supabase.storage
+      .from(WALL_BUCKET)
+      .upload(path, blob, {
+        contentType,
+        cacheControl: "31536000",
+        upsert: false,
+      });
+    if (uploadError) throw uploadError;
+    const { data: publicUrlData } = supabase.storage
+      .from(WALL_BUCKET)
+      .getPublicUrl(path);
+    imageUrl = publicUrlData.publicUrl;
   } catch (e) {
     // eslint-disable-next-line no-console
-    console.error("[wallOfFlinchers] Storage upload failed", e);
+    console.error("[wallOfFlinchers] Supabase upload failed", e);
     throw e;
   }
 
+  // 2) Write the post metadata to Firestore so the existing subscribeToWall
+  //    listener keeps working with no changes for the wall page.
   const db = getDb();
   const createdAtMs = Date.now();
   try {
@@ -72,6 +83,7 @@ export async function uploadFlinchPhoto({
       createdAt: serverTimestamp(),
       createdAtMs,
       storagePath: path,
+      storageProvider: "supabase",
     });
     return {
       id: docRef.id,
