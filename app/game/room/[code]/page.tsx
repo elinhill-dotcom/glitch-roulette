@@ -27,6 +27,16 @@ function Divider() {
 }
 
 export default function MultiplayerRoomPage() {
+  // useSearchParams must run inside a Suspense boundary so Next.js can statically
+  // analyse the page during the production build.
+  return (
+    <React.Suspense fallback={null}>
+      <MultiplayerRoomPageInner />
+    </React.Suspense>
+  );
+}
+
+function MultiplayerRoomPageInner() {
   const params = useParams<{ code: string }>();
   const search = useSearchParams();
   const code = String(params.code ?? "").toUpperCase();

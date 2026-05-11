@@ -9,6 +9,16 @@ import { NeonCard } from "../../../components/ui/NeonCard";
 import { useRoom } from "../../../state/room";
 
 export default function ResultsPage() {
+  // useSearchParams must run inside a Suspense boundary so Next.js can statically
+  // analyse the page during the production build.
+  return (
+    <React.Suspense fallback={null}>
+      <ResultsPageInner />
+    </React.Suspense>
+  );
+}
+
+function ResultsPageInner() {
   const params = useParams<{ code: string }>();
   const search = useSearchParams();
   const code = String(params.code ?? "").toUpperCase();
