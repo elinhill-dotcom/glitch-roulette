@@ -68,9 +68,10 @@ function MultiplayerRoomPageInner() {
   }, [game?.eatEndsAt]);
   const secsLeft = game?.eatEndsAt ? Math.max(0, Math.ceil((game.eatEndsAt - now) / 1000)) : null;
 
-  // Auto-resolve the per-bite confirm phase. The hot/mild question is gone — the
-  // host silently confirms with "mild" so each bite ends with just the flinch verdict
-  // and we move straight into the next countdown.
+  // The confirm phase is now resolved inline by judge_vote / finish_eat / panic
+  // (see app/state/room.ts -> resolveBite). We still listen for any legacy game
+  // state that somehow lands in confirm — typically replays from old action logs —
+  // and nudge it forward so the room never gets stuck on "Resolving bite…".
   const lastAutoConfirmedBiteRef = React.useRef<number>(-1);
   React.useEffect(() => {
     if (!room.isHost) return;
@@ -585,11 +586,16 @@ function MultiplayerRoomPageInner() {
                       const pid = game.playerOrder[idx];
                       name = room.players.find((p) => p.id === pid)?.name ?? "—";
                     }
+                    // Tiles are tight on mobile (3 cols). Show a shortened label —
+                    // typically the first word — and fall back to truncation only
+                    // for unusually long single-word names.
+                    const firstWord = name.split(/\s+/)[0] ?? name;
+                    const shortName = firstWord.length > 10 ? `${firstWord.slice(0, 9)}…` : firstWord;
                     return (
                       <div
                         key={e.biteIndex}
                         className={cn(
-                          "flex min-h-[64px] flex-col items-center justify-center gap-1 rounded-lg border px-2 py-1.5 text-center",
+                          "flex min-h-[68px] flex-col items-center justify-center gap-1 rounded-lg border px-1.5 py-1.5 text-center",
                           isPast
                             ? protocolTone(e)
                             : "border-white/12 bg-[color-mix(in_oklab,var(--card2),white_3%)]",
@@ -599,7 +605,7 @@ function MultiplayerRoomPageInner() {
                         )}
                         title={`Bite ${e.biteIndex + 1} · ${name}${isPast ? ` · ${e.status}` : ""}`}
                       >
-                        <div className="text-xl leading-none">
+                        <div className="text-lg leading-none">
                           {isPast ? (
                             <TileIcon e={e} />
                           ) : isNow ? (
@@ -607,14 +613,14 @@ function MultiplayerRoomPageInner() {
                               ●
                             </span>
                           ) : (
-                            <span className="text-sm text-white/40">
+                            <span className="text-xs text-white/40">
                               {e.biteIndex + 1}
                             </span>
                           )}
                         </div>
                         <div
                           className={cn(
-                            "w-full truncate text-sm font-black leading-tight",
+                            "w-full text-[11px] font-black leading-tight",
                             isNow
                               ? "text-[color-mix(in_oklab,var(--yellow),white_10%)]"
                               : isPast
@@ -622,7 +628,7 @@ function MultiplayerRoomPageInner() {
                                 : "text-white/55",
                           )}
                         >
-                          {name}
+                          {shortName}
                         </div>
                       </div>
                     );

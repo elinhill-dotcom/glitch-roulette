@@ -160,6 +160,52 @@ function applyHostAction(
     return yes >= threshold;
   };
 
+  /**
+   * Settle the current bite and move on. Used by judge_vote, finish_eat and
+   * panic so that the round resolves in a single dispatch — no separate
+   * confirm phase / no need for the host's tab to be in focus.
+   */
+  const resolveBite = (
+    base: NotAGlitchState,
+    finalGlitch: boolean,
+    options?: { panic?: boolean },
+  ): NotAGlitchState => {
+    const baseScores = ensureScores(base, players);
+    const updatedScores = { ...baseScores };
+    const mePrev = updatedScores[currentPlayerId] ?? { safe: 0, glitched: 0, betPoints: 0 };
+    updatedScores[currentPlayerId] = finalGlitch
+      ? { ...mePrev, glitched: (mePrev.glitched ?? 0) + 1 }
+      : { ...mePrev, safe: (mePrev.safe ?? 0) + 1 };
+
+    const status: ProtocolStatus = options?.panic
+      ? "panic"
+      : finalGlitch
+        ? "glitch"
+        : "safe";
+
+    const nextState: NotAGlitchState = {
+      ...base,
+      scores: updatedScores,
+      protocol: setProtocol(base, base.biteIndex, { status }, currentPlayer),
+      declaredSpicy: false,
+      guesses: {},
+      judgeVotes: {},
+      judgeVerdict: null,
+      countdownEndsAt: null,
+      eatEndsAt: null,
+    };
+
+    const last = base.biteIndex >= 11;
+    if (last) return { ...nextState, phase: "finished" };
+    return {
+      ...nextState,
+      phase: "countdown",
+      countdownEndsAt: null,
+      biteIndex: base.biteIndex + 1,
+      currentPlayerIndex: nextPlayerIndex(base),
+    };
+  };
+
   switch (action.a) {
     case "init": {
       const order = action.playerOrder.length ? action.playerOrder : players.map((p) => p.id);
@@ -222,48 +268,16 @@ function applyHostAction(
     case "panic": {
       if (state.phase !== "eat") return state;
       if (actorId !== currentPlayerId) return state;
-      const updatedScores = { ...scores };
-      updatedScores[currentPlayerId] = {
-        safe: updatedScores[currentPlayerId]?.safe ?? 0,
-        glitched: (updatedScores[currentPlayerId]?.glitched ?? 0) + 1,
-        betPoints: updatedScores[currentPlayerId]?.betPoints ?? 0,
-      };
-      const nextState: NotAGlitchState = {
-        ...state,
-        scores: updatedScores,
-        protocol: setProtocol(
-          state,
-          state.biteIndex,
-          { status: "panic", heat: undefined },
-          currentPlayer,
-        ),
-        declaredSpicy: false,
-        guesses: {},
-        judgeVotes: {},
-        judgeVerdict: null,
-        countdownEndsAt: null,
-        eatEndsAt: null,
-      };
-      const last = state.biteIndex >= 11;
-      if (last) return { ...nextState, phase: "finished" };
-      return {
-        ...nextState,
-        phase: "countdown",
-        countdownEndsAt: null,
-        biteIndex: state.biteIndex + 1,
-        currentPlayerIndex: nextPlayerIndex(state),
-      };
+      return resolveBite(state, true, { panic: true });
     }
     case "finish_eat": {
       if (state.phase !== "eat") return state;
       if (actorId !== currentPlayerId) return state;
+      // Whatever the judges said, settle the bite right here. We never enter the
+      // separate confirm phase anymore — that step required a second dispatch
+      // from the host and could leave the game stuck if their tab was idle.
       const verdictGlitch = flinchByVotes(state.judgeVotes);
-      return {
-        ...state,
-        phase: "confirm",
-        eatEndsAt: null,
-        judgeVerdict: verdictGlitch ? "glitch" : "safe",
-      };
+      return resolveBite(state, verdictGlitch);
     }
     case "confirm_bite": {
       if (state.phase !== "confirm") return state;
@@ -339,16 +353,13 @@ function applyHostAction(
       const judgeVotes = { ...state.judgeVotes, [actorId]: action.vote };
       const verdictGlitch = flinchByVotes(judgeVotes);
 
-      // If we're still in the eating window, allow live voting and auto-lock once threshold is hit.
+      // If we're still in the eating window, allow live voting and auto-resolve
+      // the bite once the flinch threshold is reached. We resolve inline instead
+      // of routing through the confirm phase so the round advances even if the
+      // host has navigated away.
       if (state.phase === "eat") {
         if (!verdictGlitch) return { ...state, judgeVotes };
-        return {
-          ...state,
-          judgeVotes,
-          judgeVerdict: "glitch",
-          phase: "confirm",
-          eatEndsAt: null,
-        };
+        return resolveBite({ ...state, judgeVotes, judgeVerdict: "glitch" }, true);
       }
 
       // Legacy judge phase (kept): if host still uses it, we end on threshold or when all have voted.
@@ -595,17 +606,17 @@ function useRoomFirestore(roomCode: string, name: string, isHostHint?: boolean):
         const cur = gameRef.current;
         if (!cur || cur.hostId !== self.id) return;
         if (cur.phase !== "eat") return;
-        const voters = cur.playerOrder.filter((pid) => pid !== cur.playerOrder[cur.currentPlayerIndex]);
-        const yes = voters.filter((pid) => cur.judgeVotes[pid] === "yes").length;
-        const threshold = voters.length <= 1 ? 1 : 2;
-        const verdictGlitch = yes >= threshold;
-        const next: NotAGlitchState = {
-          ...cur,
-          phase: "confirm",
-          eatEndsAt: null,
-          judgeVerdict: verdictGlitch ? "glitch" : "safe",
-        };
-        void updateDoc(roomRef, { game: stripUndefinedDeep(normalizeGameState(next)), lastActiveAt: Date.now() }).catch(() => {});
+        // Push a synthetic finish_eat through the normal reducer so the bite is
+        // settled (scores, protocol, next player) in a single Firestore write.
+        const currentEater = cur.playerOrder[cur.currentPlayerIndex];
+        if (!currentEater) return;
+        const settled = applyHostAction(cur, playersRef.current, currentEater, {
+          a: "finish_eat",
+        });
+        void updateDoc(roomRef, {
+          game: stripUndefinedDeep(normalizeGameState(settled)),
+          lastActiveAt: Date.now(),
+        }).catch(() => {});
       }, ms + 60);
       return () => window.clearTimeout(t);
     }
@@ -868,18 +879,15 @@ function useRoomLocal(roomCode: string, name: string, isHostHint?: boolean): Roo
         setGame((cur) => {
           if (!cur || cur.hostId !== self.id) return cur;
           if (cur.phase !== "eat") return cur;
-          const voters = cur.playerOrder.filter((pid) => pid !== cur.playerOrder[cur.currentPlayerIndex]);
-          const yes = voters.filter((pid) => cur.judgeVotes[pid] === "yes").length;
-          const threshold = voters.length <= 1 ? 1 : 2;
-          const verdictGlitch = yes >= threshold;
-          const next: NotAGlitchState = {
-            ...cur,
-            phase: "confirm",
-            eatEndsAt: null,
-            judgeVerdict: verdictGlitch ? "glitch" : "safe",
-          };
-          channelRef.current?.postMessage({ t: "state", state: next } satisfies Msg);
-          return next;
+          const currentEater = cur.playerOrder[cur.currentPlayerIndex];
+          if (!currentEater) return cur;
+          // Reuse the reducer so the bite resolves in one go (scores, protocol,
+          // next player) without parking the game in a separate confirm phase.
+          const settled = applyHostAction(cur, playersRef.current, currentEater, {
+            a: "finish_eat",
+          });
+          channelRef.current?.postMessage({ t: "state", state: settled } satisfies Msg);
+          return settled;
         });
       }, ms + 40);
       return () => window.clearTimeout(t);
