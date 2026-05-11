@@ -675,15 +675,26 @@ export function CameraRecorder({ open, onOpenChange, playerName, roomCode }: Pro
             </div>
           ) : null}
 
-          {/* PHOTO PREVIEW takes precedence over the live feed */}
+          {/* PHOTO PREVIEW takes precedence over the live feed.
+              We use object-contain (not object-cover) so the full baked-in
+              "FLINCHED AT SALUD!" overlay at the bottom of the frame is visible
+              instead of being cropped by a fixed-height container. */}
           {status === "photo-done" && photoUrl ? (
-            <div className="mt-3 overflow-hidden rounded-2xl border border-white/10 bg-black">
+            <div className="mt-3 grid place-items-center overflow-hidden rounded-2xl border border-white/10 bg-black">
               {/* eslint-disable-next-line @next/next/no-img-element */}
-              <img src={photoUrl} alt="Captured" className="h-72 w-full object-cover" />
+              <img
+                src={photoUrl}
+                alt="Captured"
+                className="max-h-[60vh] w-full object-contain"
+              />
             </div>
           ) : status === "video-done" && videoUrl ? (
-            <div className="mt-3 overflow-hidden rounded-2xl border border-white/10 bg-black">
-              <video src={videoUrl} controls className="h-72 w-full object-cover" />
+            <div className="mt-3 grid place-items-center overflow-hidden rounded-2xl border border-white/10 bg-black">
+              <video
+                src={videoUrl}
+                controls
+                className="max-h-[60vh] w-full object-contain"
+              />
             </div>
           ) : (
             <div className="relative mt-3 overflow-hidden rounded-2xl border border-white/10 bg-black">
