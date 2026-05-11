@@ -770,14 +770,24 @@ export function CameraRecorder({ open, onOpenChange, playerName, roomCode }: Pro
 
           <div className="mt-4 flex flex-col gap-2">
             {status === "ready" ? (
-              <div className="grid grid-cols-2 gap-2">
-                <Button onClick={takePhoto} size="lg">
-                  📸 Take photo
+              <>
+                <div className="grid grid-cols-2 gap-2">
+                  <Button onClick={takePhoto} size="lg">
+                    📸 Take photo
+                  </Button>
+                  <Button onClick={startVideo} size="lg" variant="secondary">
+                    ⏺ Record video
+                  </Button>
+                </div>
+                <Button
+                  onClick={() => onOpenChange(false)}
+                  size="md"
+                  variant="ghost"
+                  className="w-full"
+                >
+                  ← Back to game
                 </Button>
-                <Button onClick={startVideo} size="lg" variant="secondary">
-                  ⏺ Record video
-                </Button>
-              </div>
+              </>
             ) : null}
 
             {status === "recording" ? (
@@ -854,18 +864,37 @@ export function CameraRecorder({ open, onOpenChange, playerName, roomCode }: Pro
                     {wallError}
                   </div>
                 ) : null}
+
+                <Button
+                  onClick={() => onOpenChange(false)}
+                  size="md"
+                  variant="ghost"
+                  className="w-full"
+                >
+                  ← Back to game
+                </Button>
               </div>
             ) : null}
 
             {status === "video-done" ? (
-              <div className="grid grid-cols-2 gap-2">
-                <Button onClick={shareVideo} size="lg">
-                  Share video
+              <>
+                <div className="grid grid-cols-2 gap-2">
+                  <Button onClick={shareVideo} size="lg">
+                    Share video
+                  </Button>
+                  <Button onClick={reset} size="lg" variant="secondary">
+                    Record again
+                  </Button>
+                </div>
+                <Button
+                  onClick={() => onOpenChange(false)}
+                  size="md"
+                  variant="ghost"
+                  className="w-full"
+                >
+                  ← Back to game
                 </Button>
-                <Button onClick={reset} size="lg" variant="secondary">
-                  Record again
-                </Button>
-              </div>
+              </>
             ) : null}
           </div>
 
