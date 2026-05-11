@@ -518,7 +518,7 @@ export function CameraRecorder({ open, onOpenChange, playerName, roomCode }: Pro
     }
   }, []);
 
-  const sharePhoto = React.useCallback(async () => {
+  const savePhoto = React.useCallback(async () => {
     if (!photoUrl) return;
     const res = await fetch(photoUrl);
     const blob = await res.blob();
@@ -530,8 +530,8 @@ export function CameraRecorder({ open, onOpenChange, playerName, roomCode }: Pro
         try {
           await navigator.share({
             files: [file],
-            title: "Not a Flinch",
-            text: "Caught a moment in Not a Flinch.",
+            title: "Save photo",
+            text: "Save this photo to your camera roll.",
           });
           return;
         } catch {
@@ -543,6 +543,10 @@ export function CameraRecorder({ open, onOpenChange, playerName, roomCode }: Pro
     a.href = photoUrl;
     a.download = "not-a-flinch.jpg";
     a.click();
+    setPlatformHint(
+      "Downloaded. On iPhone: tap Share → Save Image. On Android: open the file and add it to Photos/Gallery.",
+    );
+    window.setTimeout(() => setPlatformHint(null), 7000);
   }, [photoUrl]);
 
   const [platformHint, setPlatformHint] = React.useState<string | null>(null);
@@ -799,8 +803,8 @@ export function CameraRecorder({ open, onOpenChange, playerName, roomCode }: Pro
             {status === "photo-done" ? (
               <div className="flex flex-col gap-2">
                 <div className="grid grid-cols-2 gap-2">
-                  <Button onClick={sharePhoto} size="lg">
-                    Share photo
+                  <Button onClick={savePhoto} size="lg">
+                    💾 Save to camera roll
                   </Button>
                   <Button onClick={reset} size="lg" variant="secondary">
                     Retake
@@ -906,8 +910,8 @@ export function CameraRecorder({ open, onOpenChange, playerName, roomCode }: Pro
           </div>
 
           <div className="mt-2 text-[11px] text-[var(--muted)]">
-            On phone, Share opens your share sheet with Facebook, Instagram, Snapchat, TikTok and
-            more. On desktop the photo downloads so you can upload it manually.
+            On phone, “Save to camera roll” opens your share sheet (use “Save Image”). On desktop
+            the photo downloads so you can upload it manually.
           </div>
         </NeonCard>
       </div>
