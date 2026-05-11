@@ -841,10 +841,17 @@ export function CameraRecorder({ open, onOpenChange, playerName, roomCode }: Pro
                   <div className="flex items-center justify-between gap-2 rounded-xl border border-[color-mix(in_oklab,var(--green),transparent_50%)] bg-[color-mix(in_oklab,var(--green),transparent_88%)] px-3 py-2 text-xs font-black">
                     <span className="truncate">Posted to the wall.</span>
                     <Link
-                      href="/wall"
+                      // Open in a new tab AND include the room code so the wall
+                      // can offer a "Back to your room" link. This way the user
+                      // never loses their seat at the game.
+                      href={
+                        roomCode ? `/wall?room=${encodeURIComponent(roomCode)}` : "/wall"
+                      }
+                      target="_blank"
+                      rel="noopener noreferrer"
                       className="rounded-lg border border-white/15 bg-white/8 px-2 py-1 text-[11px] font-black hover:bg-white/12"
                     >
-                      View wall →
+                      View wall ↗
                     </Link>
                   </div>
                 ) : (

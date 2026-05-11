@@ -78,6 +78,16 @@ export default function WallPage() {
   const [lightbox, setLightbox] = React.useState<WallPost | null>(null);
   const [lightboxHint, setLightboxHint] = React.useState<string | null>(null);
 
+  // If the user landed here from inside an active game (camera modal links
+  // `/wall?room=XXX`), surface a "Back to your room" button so they never lose
+  // their seat. Read directly from window to avoid an extra Suspense boundary.
+  const [roomFromParam, setRoomFromParam] = React.useState<string | null>(null);
+  React.useEffect(() => {
+    if (typeof window === "undefined") return;
+    const code = new URLSearchParams(window.location.search).get("room");
+    if (code) setRoomFromParam(code.toUpperCase());
+  }, []);
+
   React.useEffect(() => {
     const unsub = subscribeToWall((next) => setPosts(next), { max: 120 });
     return () => unsub();
@@ -146,11 +156,19 @@ export default function WallPage() {
             </p>
           </div>
           <div className="flex flex-wrap items-center gap-2">
-            <Link href="/">
-              <Button size="sm" variant="ghost">
-                ← Back to game
-              </Button>
-            </Link>
+            {roomFromParam ? (
+              <Link href={`/game/room/${roomFromParam}`}>
+                <Button size="md" variant="primary">
+                  ← Back to room {roomFromParam}
+                </Button>
+              </Link>
+            ) : (
+              <Link href="/">
+                <Button size="sm" variant="ghost">
+                  ← Back to game
+                </Button>
+              </Link>
+            )}
           </div>
         </div>
 
