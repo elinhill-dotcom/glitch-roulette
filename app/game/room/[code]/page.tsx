@@ -172,8 +172,7 @@ function MultiplayerRoomPageInner() {
                   Not a Flinch
                 </div>
                 <div className="mt-1 text-sm text-[var(--muted)]">
-                  Whoever is up taps Start to begin their own 30-second clock. Watch them — if
-                  they flinch, vote them out.
+                  Get your friends in, then take turns surviving the spicy bite.
                 </div>
               </div>
               {game ? (
@@ -213,9 +212,16 @@ function MultiplayerRoomPageInner() {
               <div>
                 <div className="flex items-center justify-between gap-3">
                   <SectionLabel>PLAYERS · {room.players.length}/4</SectionLabel>
-                  <div className="text-[10px] font-black tracking-widest text-[var(--muted)]">
-                    MIN 2 · MAX 4
-                  </div>
+                  <span
+                    className={cn(
+                      "text-[10px] font-black tracking-widest",
+                      room.players.length >= 2
+                        ? "text-[color-mix(in_oklab,var(--green),white_8%)]"
+                        : "text-[color-mix(in_oklab,var(--yellow),white_8%)]",
+                    )}
+                  >
+                    {room.players.length >= 2 ? "READY" : "NEED ≥ 2"}
+                  </span>
                 </div>
                 <div className="mt-3 flex flex-col">
                   {room.players.slice(0, 4).map((p, i) => (
@@ -238,12 +244,11 @@ function MultiplayerRoomPageInner() {
                       {p.id === room.self.id ? <Badge tone="orange">YOU</Badge> : null}
                     </div>
                   ))}
-                  {Array.from({ length: Math.max(0, 2 - room.players.length) }).map((_, i) => (
+                  {room.players.length < 2 ? (
                     <div
-                      key={`waiting-${i}`}
                       className={cn(
                         "flex items-center gap-3 py-2",
-                        room.players.length + i > 0 ? "border-t border-white/5" : "",
+                        room.players.length > 0 ? "border-t border-white/5" : "",
                       )}
                     >
                       <div
@@ -251,34 +256,22 @@ function MultiplayerRoomPageInner() {
                         aria-hidden="true"
                       />
                       <div className="text-sm text-[var(--muted)]">
-                        Waiting for a player to join…
+                        Waiting for a friend…
                       </div>
                     </div>
-                  ))}
+                  ) : null}
                 </div>
-                {room.players.length < 2 ? (
-                  <div className="mt-2 text-[11px] text-[var(--muted)]">
-                    Minimum 2 players needed to start the match.
-                  </div>
-                ) : null}
               </div>
 
-              {/* NEXT STEP */}
               <Divider />
               {room.isHost && room.players.length >= 2 ? (
-                <div className="flex flex-col gap-4">
-                  <div>
-                    <SectionLabel>READY TO PLAY</SectionLabel>
-                    <div className="mt-1 text-xl font-black tracking-tight sm:text-2xl">
-                      Start the match
-                    </div>
-                    <div className="mt-1 text-sm text-[var(--muted)]">
-                      Pick who takes the first bite, then start.
-                    </div>
-                  </div>
-
+                /* Ready to play — short and direct */
+                <div className="flex flex-col gap-3">
+                  <SectionLabel>READY TO PLAY</SectionLabel>
                   <label className="flex flex-col gap-2">
-                    <SectionLabel>WHO STARTS</SectionLabel>
+                    <span className="text-[11px] font-black tracking-widest text-[var(--muted)]">
+                      WHO STARTS
+                    </span>
                     <select
                       className="h-12 rounded-xl border border-white/10 bg-white/5 px-4 text-sm font-black outline-none focus-visible:ring-2 focus-visible:ring-[var(--ring)]"
                       value={startPlayerId}
@@ -291,7 +284,6 @@ function MultiplayerRoomPageInner() {
                       ))}
                     </select>
                   </label>
-
                   <Button
                     size="lg"
                     onClick={() => {
@@ -307,64 +299,41 @@ function MultiplayerRoomPageInner() {
                     Start match · {room.players.length} player
                     {room.players.length === 1 ? "" : "s"}
                   </Button>
-
-                  <div className="text-[11px] text-[var(--muted)]">
-                    Need more friends? Share the invite — late joiners can still hop in before
-                    the first bite.
+                </div>
+              ) : room.isHost ? (
+                /* Single block — invite, button, code */
+                <div className="flex flex-col gap-2">
+                  <SectionLabel>Share with your friends</SectionLabel>
+                  <div className="text-sm text-[var(--muted)]">
+                    Tap to send the link via SMS, WhatsApp or any app. The room code is included.
                   </div>
-                  <RoomInvite code={code} hostName={room.self.name} size="sm" />
-                  <div className="text-[11px] text-[var(--muted)]">
-                    Room code:{" "}
+                  <div className="mt-2">
+                    <RoomInvite code={code} hostName={room.self.name} size="lg" />
+                  </div>
+                  <div className="mt-1 text-[11px] text-[var(--muted)]">
+                    Or read out the code:{" "}
                     <span className="font-black tracking-[0.25em] text-white tabular-nums">
                       {code}
                     </span>
                   </div>
                 </div>
-              ) : room.isHost ? (
-                <div className="flex flex-col gap-4">
-                  <div>
-                    <SectionLabel>STEP 1 · INVITE YOUR FRIENDS</SectionLabel>
-                    <div className="mt-1 text-xl font-black tracking-tight sm:text-2xl">
-                      Send the link — they join in one tap
-                    </div>
-                    <div className="mt-1 text-sm leading-6 text-[var(--muted)]">
-                      Tap <span className="font-black text-white">Share invite</span> to send the
-                      room via SMS, Messenger, mail or any app. The link pre-fills the room code
-                      for them.
-                    </div>
-                  </div>
-
-                  <div>
-                    <SectionLabel>ROOM CODE</SectionLabel>
-                    <div className="mt-1 font-black tracking-[0.35em] text-3xl sm:text-4xl text-[color-mix(in_oklab,var(--orange),white_8%)] tabular-nums">
-                      {code}
-                    </div>
-                  </div>
-
-                  <RoomInvite code={code} hostName={room.self.name} size="lg" />
-                </div>
               ) : (
                 <div className="flex flex-col gap-2">
-                  <SectionLabel>YOU&apos;RE IN</SectionLabel>
-                  <div className="text-xl font-black tracking-tight sm:text-2xl">
-                    Waiting for host to start
-                  </div>
-                  <div className="text-sm leading-6 text-[var(--muted)]">
-                    The host will tap{" "}
-                    <span className="font-black text-white">Start match</span> once everyone is
-                    in. Sit tight — the first bite is on its way.
+                  <SectionLabel>Waiting for host</SectionLabel>
+                  <div className="text-sm text-[var(--muted)]">
+                    Sit tight — the host will tap{" "}
+                    <span className="font-black text-white">Start match</span> when everyone&apos;s
+                    in.
                   </div>
                 </div>
               )}
 
-              {/* SAFETY */}
-              <Divider />
-              <div className="text-[11px] leading-5 text-[var(--muted)]">
+              {/* SAFETY — tucked away at the very bottom */}
+              <div className="text-[10px] leading-4 text-[var(--muted)]">
                 <span className="font-black text-[color-mix(in_oklab,var(--red),white_6%)]">
                   Safety:
                 </span>{" "}
-                Extremely spicy peppers. All participants confirm they are 18+, have no heart or
-                respiratory conditions, and are not allergic to capsaicin.
+                Spicy peppers. Participants confirm 18+, no heart conditions, no capsaicin allergy.
               </div>
             </>
           ) : game.phase === "wager" ? (
