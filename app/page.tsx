@@ -39,8 +39,9 @@ export default function Home() {
               No Flinch <span className="text-white/70">Chili Cheese</span>
             </div>
             <div className="text-sm leading-6 text-white/80">
-              12 one-bite appetizers. 2 are extremely spicy. Guess first, eat fast, and don&apos;t
-              flinch.
+              <span className="font-black text-[color-mix(in_oklab,var(--orange),white_10%)]">NEW!</span>{" "}
+              Boardgame + appetizers in one. 12 one-bite appetizers. 2 are extremely spicy. Eat fast,
+              and don&apos;t flinch.
             </div>
             <div className="mt-2 flex flex-col gap-3 sm:flex-row">
               <Link href="/game/create" className="w-full sm:w-auto">
