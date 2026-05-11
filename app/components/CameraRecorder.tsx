@@ -291,23 +291,30 @@ function drawFlinchOverlay(
   ctx.fill();
   if (logo && logo.complete && logo.naturalWidth > 0) {
     const inset = Math.round(logoSize * 0.12);
+    const innerX = logoX + inset;
+    const innerY = logoY + inset;
+    const innerSize = logoSize - 2 * inset;
+    // Preserve the logo's aspect ratio — letterbox it inside the square so the
+    // graphic never gets stretched the way it did when we used innerSize × innerSize
+    // unconditionally.
+    const lw = logo.naturalWidth;
+    const lh = logo.naturalHeight;
+    const scale = Math.min(innerSize / lw, innerSize / lh);
+    const drawW = lw * scale;
+    const drawH = lh * scale;
+    const drawX = innerX + (innerSize - drawW) / 2;
+    const drawY = innerY + (innerSize - drawH) / 2;
     ctx.save();
     roundRectPath(
       ctx,
-      logoX + inset,
-      logoY + inset,
-      logoSize - 2 * inset,
-      logoSize - 2 * inset,
+      innerX,
+      innerY,
+      innerSize,
+      innerSize,
       Math.round(logoSize * 0.16),
     );
     ctx.clip();
-    ctx.drawImage(
-      logo,
-      logoX + inset,
-      logoY + inset,
-      logoSize - 2 * inset,
-      logoSize - 2 * inset,
-    );
+    ctx.drawImage(logo, drawX, drawY, drawW, drawH);
     ctx.restore();
   }
 
