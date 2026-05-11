@@ -1,6 +1,6 @@
 "use client";
 
-import { useRouter } from "next/navigation";
+import { useRouter, useSearchParams } from "next/navigation";
 import * as React from "react";
 import { Badge } from "../../components/ui/Badge";
 import { Button } from "../../components/ui/Button";
@@ -9,7 +9,9 @@ import { onlineMultiplayerDisabledReason } from "../../lib/multiplayerEnv";
 
 export default function JoinRoomPage() {
   const router = useRouter();
-  const [code, setCode] = React.useState("");
+  const search = useSearchParams();
+  const initialCode = (search.get("code") ?? "").toUpperCase().replace(/[^A-Z0-9]/g, "").slice(0, 6);
+  const [code, setCode] = React.useState(initialCode);
   const [name, setName] = React.useState("Player");
   const disabledReason = onlineMultiplayerDisabledReason();
 

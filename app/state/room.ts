@@ -72,6 +72,7 @@ type RoomAction =
   | { a: "set_wager"; wager: WagerType }
   | { a: "guess"; guess: Guess }
   | { a: "declare_spicy" }
+  | { a: "start_eat" }
   | { a: "panic" }
   | { a: "finish_eat" }
   | { a: "confirm_bite"; biteType: "mild" | "hot" }
@@ -184,19 +185,28 @@ function applyHostAction(
     }
     case "set_wager": {
       if (state.phase !== "wager") return state;
-      return { ...state, wager: action.wager, phase: "guess" };
-    }
-    case "guess": {
-      if (state.phase !== "guess") return state;
-      const guesses = { ...state.guesses, [actorId]: action.guess };
-      const allGuessed = state.playerOrder.every((pid) => guesses[pid]);
-      if (!allGuessed) return { ...state, guesses };
-      const now = Date.now();
+      // Guess phase removed. We wait in the "countdown" phase until the current
+      // player presses "Start my turn" (start_eat action). No auto-start.
       return {
         ...state,
-        guesses,
+        wager: action.wager,
         phase: "countdown",
-        countdownEndsAt: now + 3000,
+        countdownEndsAt: null,
+      };
+    }
+    case "guess": {
+      // Guess phase removed — kept as no-op so legacy clients can still dispatch.
+      return state;
+    }
+    case "start_eat": {
+      // The player whose turn it is starts their own 30-second clock.
+      if (state.phase !== "countdown") return state;
+      if (actorId !== currentPlayerId) return state;
+      return {
+        ...state,
+        phase: "eat",
+        countdownEndsAt: null,
+        eatEndsAt: Date.now() + 30000,
       };
     }
     case "declare_spicy": {
@@ -238,7 +248,8 @@ function applyHostAction(
       if (last) return { ...nextState, phase: "finished" };
       return {
         ...nextState,
-        phase: "guess",
+        phase: "countdown",
+        countdownEndsAt: null,
         biteIndex: state.biteIndex + 1,
         currentPlayerIndex: nextPlayerIndex(state),
       };
@@ -256,7 +267,9 @@ function applyHostAction(
     }
     case "confirm_bite": {
       if (state.phase !== "confirm") return state;
-      if (actorId !== currentPlayerId) return state;
+      // Note: the confirm phase is auto-resolved by the room page nowadays —
+      // any client (typically the host) may dispatch this since the hot/mild
+      // question was removed from the game.
       const isDeclared = state.declaredSpicy;
       const updatedScores = { ...scores };
 
@@ -314,7 +327,8 @@ function applyHostAction(
       if (last) return { ...nextState, phase: "finished" };
       return {
         ...nextState,
-        phase: "guess",
+        phase: "countdown",
+        countdownEndsAt: null,
         biteIndex: state.biteIndex + 1,
         currentPlayerIndex: nextPlayerIndex(state),
       };
@@ -572,23 +586,8 @@ function useRoomFirestore(roomCode: string, name: string, isHostHint?: boolean):
     if (!game) return;
     if (game.hostId !== self.id) return;
 
-    if (game.phase === "countdown" && game.countdownEndsAt) {
-      const ms = Math.max(0, game.countdownEndsAt - Date.now());
-      const t = window.setTimeout(() => {
-        const cur = gameRef.current;
-        if (!cur || cur.hostId !== self.id) return;
-        if (cur.phase !== "countdown") return;
-        const now = Date.now();
-        const next: NotAGlitchState = {
-          ...cur,
-          phase: "eat",
-          countdownEndsAt: null,
-          eatEndsAt: now + 30000,
-        };
-        void updateDoc(roomRef, { game: stripUndefinedDeep(normalizeGameState(next)), lastActiveAt: Date.now() }).catch(() => {});
-      }, ms + 40);
-      return () => window.clearTimeout(t);
-    }
+    // Countdown phase no longer auto-advances — the current player presses
+    // "Start my turn" (start_eat action) when they're ready.
 
     if (game.phase === "eat" && game.eatEndsAt) {
       const ms = Math.max(0, game.eatEndsAt - Date.now());
@@ -861,20 +860,8 @@ function useRoomLocal(roomCode: string, name: string, isHostHint?: boolean): Roo
   React.useEffect(() => {
     if (!game) return;
     if (game.hostId !== self.id) return;
-    if (game.phase === "countdown" && game.countdownEndsAt) {
-      const ms = Math.max(0, game.countdownEndsAt - Date.now());
-      const t = window.setTimeout(() => {
-        setGame((cur) => {
-          if (!cur || cur.hostId !== self.id) return cur;
-          if (cur.phase !== "countdown") return cur;
-          const now = Date.now();
-          const next: NotAGlitchState = { ...cur, phase: "eat", countdownEndsAt: null, eatEndsAt: now + 30000 };
-          channelRef.current?.postMessage({ t: "state", state: next } satisfies Msg);
-          return next;
-        });
-      }, ms + 20);
-      return () => window.clearTimeout(t);
-    }
+    // Countdown phase no longer auto-advances — the eater dispatches start_eat
+    // when they tap "Start my turn", which transitions into the 30s eat phase.
     if (game.phase === "eat" && game.eatEndsAt) {
       const ms = Math.max(0, game.eatEndsAt - Date.now());
       const t = window.setTimeout(() => {

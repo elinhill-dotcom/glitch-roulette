@@ -1,6 +1,7 @@
 import { initializeApp, getApps, type FirebaseApp } from "firebase/app";
 import { getFirestore } from "firebase/firestore";
 import { getAuth } from "firebase/auth";
+import { getStorage } from "firebase/storage";
 
 const FALLBACK_FIREBASE_CONFIG = {
   apiKey: "AIzaSyDWAxyUff3t6m8u7M-S8_f6m1YCUipohUs",
@@ -39,4 +40,8 @@ export function getDb() {
 
 export function getFirebaseAuth() {
   return getAuth(getFirebaseApp());
+}
+
+export function getStorageBucket() {
+  return getStorage(getFirebaseApp());
 }

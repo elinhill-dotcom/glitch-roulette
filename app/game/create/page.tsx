@@ -23,7 +23,6 @@ export default function CreateRoomPage() {
         <div className="flex flex-col gap-4">
           <div className="flex flex-wrap items-center gap-2">
             <Badge tone="orange">Create room</Badge>
-            <Badge tone="neutral">Sports-bar mode</Badge>
           </div>
 
           <div className="text-2xl font-black tracking-tight">Start the chaos</div>

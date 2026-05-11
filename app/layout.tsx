@@ -15,8 +15,8 @@ const geistMono = Geist_Mono({
 });
 
 export const metadata: Metadata = {
-  title: "Flinch Roulette",
-  description: "Sports-bar ordering + spicy multiplayer flinch challenge.",
+  title: "Not a Flinch",
+  description: "Spicy multiplayer flinch challenge.",
 };
 
 export default function RootLayout({

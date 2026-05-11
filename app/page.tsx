@@ -1,54 +1,82 @@
 import Link from "next/link";
+import Image from "next/image";
 import { Badge } from "./components/ui/Badge";
 import { Button } from "./components/ui/Button";
 import { NeonCard } from "./components/ui/NeonCard";
 
 export default function Home() {
   return (
-    <div className="mx-auto w-full max-w-5xl py-4 sm:py-8">
-      <NeonCard
-        className="relative overflow-hidden p-6 sm:p-10"
-        glow="orange"
-      >
+    <div className="flex flex-col gap-5">
+      <NeonCard className="relative overflow-hidden p-6 sm:p-10" glow="orange">
+        <Image
+          src="/hero/spicy-arena-fire.jpg"
+          alt="Spicy arena background"
+          fill
+          priority
+          className="pointer-events-none object-cover"
+          sizes="(max-width: 768px) 100vw, 900px"
+        />
         <div
-          className="pointer-events-none absolute inset-0 bg-[radial-gradient(900px_420px_at_10%_0%,color-mix(in_oklab,var(--green),transparent_86%),transparent_62%),radial-gradient(900px_420px_at_95%_10%,color-mix(in_oklab,var(--orange),transparent_86%),transparent_62%)]"
+          className="pointer-events-none absolute inset-0 bg-[linear-gradient(180deg,rgba(0,0,0,0.45),rgba(0,0,0,0.82))]"
           aria-hidden="true"
         />
-        <div className="relative flex flex-col gap-5 sm:gap-6">
-          <div className="flex flex-wrap items-center gap-2">
-            <Badge tone="green">Premium sports bar</Badge>
-            <Badge tone="orange">Fast ordering</Badge>
-            <Badge tone="neutral">Multiplayer game</Badge>
+        <div
+          className="pointer-events-none absolute bottom-0 left-0 right-0 h-1"
+          style={{
+            background:
+              "linear-gradient(90deg,var(--green),var(--orange),var(--red),var(--yellow))",
+          }}
+          aria-hidden="true"
+        />
+        <div className="relative grid grid-cols-1 gap-6 sm:grid-cols-[1.2fr_0.8fr] sm:items-end">
+          <div className="flex flex-col gap-3">
+            <div className="flex flex-wrap items-center gap-2">
+              <Badge tone="orange">Not a Flinch</Badge>
+              <Badge tone="green">Multiplayer</Badge>
+              <Badge tone="neutral">Scoreboard</Badge>
+            </div>
+            <div className="text-2xl font-black tracking-tight sm:text-4xl">
+              No Flinch <span className="text-white/70">Chili Cheese</span>
+            </div>
+            <div className="text-sm leading-6 text-white/80">
+              12 one-bite appetizers. 2 are extremely spicy. Guess first, eat fast, and don&apos;t
+              flinch.
+            </div>
+            <div className="mt-2 flex flex-col gap-3 sm:flex-row">
+              <Link href="/game/create" className="w-full sm:w-auto">
+                <Button className="w-full" size="lg">
+                  Create room
+                </Button>
+              </Link>
+              <Link href="/game/join" className="w-full sm:w-auto">
+                <Button className="w-full" size="lg" variant="secondary">
+                  Join room
+                </Button>
+              </Link>
+            </div>
+            <div className="flex flex-wrap items-center gap-x-3 gap-y-1 text-xs text-white/70">
+              <span>Share the room link with friends to play together.</span>
+              <Link
+                href="/wall"
+                className="font-black text-[color-mix(in_oklab,var(--orange),white_10%)] underline-offset-4 hover:underline"
+              >
+                🔥 See the Wall of Flinchers →
+              </Link>
+            </div>
           </div>
 
-          <h1 className="text-balance text-3xl font-black tracking-tight sm:text-5xl">
-            Modern sports-bar ordering —
-            <span className="text-[color-mix(in_oklab,var(--orange),white_6%)]">
-              {" "}
-              with a spicy roulette twist.
-            </span>
-          </h1>
-          <p className="text-pretty text-sm leading-7 text-[var(--muted)] sm:text-lg">
-            Welcome to <span className="font-extrabold text-white">Flinch Roulette</span>. Tap
-            through the menu, build your cart, then jump into the Spicy Challenge for a
-            scoreboard-style showdown.
-          </p>
-
-          <div className="flex flex-col gap-3 sm:flex-row sm:items-center">
-            <Link href="/menu" className="w-full sm:w-auto">
-              <Button className="w-full" size="lg">
-                Open Menu
-              </Button>
-            </Link>
-            <Link href="/game" className="w-full sm:w-auto">
-              <Button className="w-full" size="lg" variant="secondary">
-                Enter Spicy Challenge
-              </Button>
-            </Link>
-          </div>
-
-          <div className="mt-2 text-xs text-[var(--muted)]">
-            Tip: open the game in multiple tabs to simulate multiplayer instantly.
+          <div className="relative overflow-hidden rounded-2xl border border-white/12 bg-white/5 shadow-[var(--shadow-soft)]">
+            <div className="relative aspect-[4/3] w-full">
+              <Image
+                src="/hero/no-flinch-product.png"
+                alt="No Flinch product"
+                fill
+                className="object-cover"
+                sizes="(max-width: 768px) 100vw, 420px"
+                priority
+              />
+            </div>
+            <div className="pointer-events-none absolute inset-0 bg-[linear-gradient(180deg,transparent,rgba(0,0,0,0.35))]" />
           </div>
         </div>
       </NeonCard>
