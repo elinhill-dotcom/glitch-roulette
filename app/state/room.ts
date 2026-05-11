@@ -362,15 +362,12 @@ function applyHostAction(
         return resolveBite({ ...state, judgeVotes, judgeVerdict: "glitch" }, true);
       }
 
-      // Legacy judge phase (kept): if host still uses it, we end on threshold or when all have voted.
+      // Legacy "judge" phase shouldn't be reachable today (we never set it),
+      // but if a stale game state ever lands here, also resolve the bite
+      // immediately instead of parking in the now-removed confirm phase.
       const allVoted = voters.every((pid) => judgeVotes[pid]);
       if (!allVoted && !verdictGlitch) return { ...state, judgeVotes };
-      return {
-        ...state,
-        judgeVotes,
-        judgeVerdict: verdictGlitch ? "glitch" : "safe",
-        phase: "confirm",
-      };
+      return resolveBite({ ...state, judgeVotes, judgeVerdict: verdictGlitch ? "glitch" : "safe" }, verdictGlitch);
     }
     case "reset": {
       return {
@@ -627,12 +624,20 @@ function useRoomFirestore(roomCode: string, name: string, isHostHint?: boolean):
   // same resolved state; Firestore handles the last-write-wins. This makes the
   // game unstickable even if the host's tab is asleep or running old code that
   // left the room in `phase: "confirm"`.
+  //
+  // IMPORTANT: deps are intentionally narrow (phase + biteIndex). The full
+  // `game` object gets a fresh reference on every Firestore snapshot, which
+  // would otherwise re-run this effect constantly and never let the 800 ms
+  // timeout fire.
+  const stuckPhase = game?.phase;
+  const stuckBite = game?.biteIndex ?? -1;
   React.useEffect(() => {
-    if (!game) return;
-    if (game.phase !== "confirm") return;
+    if (stuckPhase !== "confirm") return;
     const t = window.setTimeout(() => {
       const cur = gameRef.current;
       if (!cur || cur.phase !== "confirm") return;
+      // eslint-disable-next-line no-console
+      console.warn("[room] auto-resolving stuck confirm phase, bite=", cur.biteIndex);
       const settled = applyHostAction(cur, playersRef.current, self.id, {
         a: "confirm_bite",
         biteType: "mild",
@@ -640,10 +645,13 @@ function useRoomFirestore(roomCode: string, name: string, isHostHint?: boolean):
       void updateDoc(roomRef, {
         game: stripUndefinedDeep(normalizeGameState(settled)),
         lastActiveAt: Date.now(),
-      }).catch(() => {});
-    }, 1200);
+      }).catch((err) => {
+        // eslint-disable-next-line no-console
+        console.error("[room] failed to write resolved state", err);
+      });
+    }, 800);
     return () => window.clearTimeout(t);
-  }, [game, self.id, roomRef]);
+  }, [stuckPhase, stuckBite, self.id, roomRef]);
 
   return {
     self,
@@ -919,12 +927,17 @@ function useRoomLocal(roomCode: string, name: string, isHostHint?: boolean): Roo
 
   // Local-mode safety net for the legacy "confirm" phase. Same idea as the
   // Firestore version above — auto-advance so the round never gets stuck.
+  // Deps are narrow (phase + biteIndex) so the timer isn't reset on every
+  // unrelated state change.
+  const localStuckPhase = game?.phase;
+  const localStuckBite = game?.biteIndex ?? -1;
   React.useEffect(() => {
-    if (!game) return;
-    if (game.phase !== "confirm") return;
+    if (localStuckPhase !== "confirm") return;
     const t = window.setTimeout(() => {
       setGame((cur) => {
         if (!cur || cur.phase !== "confirm") return cur;
+        // eslint-disable-next-line no-console
+        console.warn("[room/local] auto-resolving stuck confirm phase, bite=", cur.biteIndex);
         const settled = applyHostAction(cur, playersRef.current, self.id, {
           a: "confirm_bite",
           biteType: "mild",
@@ -932,9 +945,9 @@ function useRoomLocal(roomCode: string, name: string, isHostHint?: boolean): Roo
         channelRef.current?.postMessage({ t: "state", state: settled } satisfies Msg);
         return settled;
       });
-    }, 1200);
+    }, 800);
     return () => window.clearTimeout(t);
-  }, [game, self.id]);
+  }, [localStuckPhase, localStuckBite, self.id]);
 
   return { self, players, canMultiplayer, isHost, game, dispatch };
 }
