@@ -49,4 +49,4 @@ export function getSupabase(): SupabaseClient {
 }
 
 /** Name of the public Storage bucket that holds Wall of Flinchers photos. */
-export const WALL_BUCKET = "wall-of-flinchers";
+export const WALL_BUCKET = "Wall of flinchers";
