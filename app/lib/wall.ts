@@ -49,31 +49,50 @@ export async function uploadFlinchPhoto({
   const ext = blob.type.includes("png") ? "png" : "jpg";
   const path = `${WALL_STORAGE_PREFIX}/${id}.${ext}`;
   const storageRef = ref(storage, path);
-  await uploadBytes(storageRef, blob, {
-    contentType: blob.type || "image/jpeg",
-    customMetadata: { playerName, roomCode: roomCode ?? "" },
-  });
-  const imageUrl = await getDownloadURL(storageRef);
+  let imageUrl: string;
+  try {
+    await uploadBytes(storageRef, blob, {
+      contentType: blob.type || "image/jpeg",
+      customMetadata: { playerName, roomCode: roomCode ?? "" },
+    });
+    imageUrl = await getDownloadURL(storageRef);
+  } catch (e) {
+    // eslint-disable-next-line no-console
+    console.error("[wallOfFlinchers] Storage upload failed", e);
+    throw e;
+  }
+
   const db = getDb();
-  const docRef = await addDoc(collection(db, WALL_COLLECTION), {
-    imageUrl,
-    playerName: playerName.slice(0, 40) || "Anonymous",
-    roomCode: roomCode ?? null,
-    createdAt: serverTimestamp(),
-    createdAtMs: Date.now(),
-    storagePath: path,
-  });
-  return {
-    id: docRef.id,
-    imageUrl,
-    playerName,
-    roomCode: roomCode ?? null,
-    createdAt: Date.now(),
-  };
+  const createdAtMs = Date.now();
+  try {
+    const docRef = await addDoc(collection(db, WALL_COLLECTION), {
+      imageUrl,
+      playerName: playerName.slice(0, 40) || "Anonymous",
+      roomCode: roomCode ?? null,
+      createdAt: serverTimestamp(),
+      createdAtMs,
+      storagePath: path,
+    });
+    return {
+      id: docRef.id,
+      imageUrl,
+      playerName,
+      roomCode: roomCode ?? null,
+      createdAt: createdAtMs,
+    };
+  } catch (e) {
+    // eslint-disable-next-line no-console
+    console.error("[wallOfFlinchers] Firestore write failed", e);
+    throw e;
+  }
 }
 
 /**
  * Subscribe to the latest wall posts. Returns an unsubscribe function.
+ *
+ * NOTE: ordering uses the client-set `createdAtMs` (not the Firestore
+ * serverTimestamp) so freshly-posted docs appear immediately, before the
+ * server has had a chance to backfill the serverTimestamp field.
  */
 export function subscribeToWall(
   onChange: (posts: WallPost[]) => void,
@@ -82,7 +101,7 @@ export function subscribeToWall(
   const db = getDb();
   const q = query(
     collection(db, WALL_COLLECTION),
-    orderBy("createdAt", "desc"),
+    orderBy("createdAtMs", "desc"),
     limit(options?.max ?? 60),
   );
   return onSnapshot(
@@ -99,12 +118,16 @@ export function subscribeToWall(
         };
         if (!data.imageUrl) return;
         let createdAt = 0;
-        if (data.createdAt && typeof data.createdAt === "object" && "toMillis" in data.createdAt) {
+        if (typeof data.createdAtMs === "number") {
+          createdAt = data.createdAtMs;
+        } else if (
+          data.createdAt &&
+          typeof data.createdAt === "object" &&
+          "toMillis" in data.createdAt
+        ) {
           createdAt = (data.createdAt as Timestamp).toMillis();
         } else if (typeof data.createdAt === "number") {
           createdAt = data.createdAt;
-        } else if (typeof data.createdAtMs === "number") {
-          createdAt = data.createdAtMs;
         }
         posts.push({
           id: doc.id,

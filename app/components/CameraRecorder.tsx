@@ -538,6 +538,73 @@ export function CameraRecorder({ open, onOpenChange, playerName, roomCode }: Pro
     a.click();
   }, [photoUrl]);
 
+  const [platformHint, setPlatformHint] = React.useState<string | null>(null);
+  const shareToPlatform = React.useCallback(
+    async (platform: "Facebook" | "Instagram" | "Snapchat" | "TikTok") => {
+      if (!photoUrl) return;
+      const res = await fetch(photoUrl);
+      const blob = await res.blob();
+      const file = new File([blob], "not-a-flinch.jpg", { type: "image/jpeg" });
+
+      // On mobile, the native share sheet exposes Facebook/Instagram/Snapchat/TikTok
+      // and any other app the user has installed. This is the best path for IG/Snap/TikTok
+      // since they don't accept third-party uploads via URL.
+      if ("share" in navigator) {
+        const canShare =
+          "canShare" in navigator ? navigator.canShare?.({ files: [file] }) : false;
+        if (canShare) {
+          try {
+            await navigator.share({
+              files: [file],
+              title: "Not a Flinch",
+              text: `Flinched at Salud! Share to ${platform} 🔥`,
+            });
+            return;
+          } catch {
+            // user cancelled — just fall through to the desktop path
+          }
+        }
+      }
+
+      if (platform === "Facebook") {
+        // Facebook has a working web sharer for URLs. We post to the wall first so the
+        // photo has a public URL Facebook can fetch.
+        try {
+          setWallStatus("posting");
+          const post = await uploadFlinchPhoto({
+            blob,
+            playerName: playerName ?? "Anonymous",
+            roomCode: roomCode ?? null,
+          });
+          setWallStatus("posted");
+          window.open(
+            `https://www.facebook.com/sharer/sharer.php?u=${encodeURIComponent(post.imageUrl)}`,
+            "_blank",
+            "noopener,noreferrer",
+          );
+          return;
+        } catch (e: unknown) {
+          const msg = e instanceof Error ? e.message : "Could not prepare Facebook share";
+          setWallError(msg);
+          setWallStatus("error");
+          // fall through to download fallback
+        }
+      }
+
+      // Desktop fallback for IG / Snap / TikTok: download the image and tell
+      // the user how to use it from each app.
+      const a = document.createElement("a");
+      a.href = photoUrl;
+      a.download = "not-a-flinch.jpg";
+      a.click();
+      setPlatformHint(
+        `Image saved. Open ${platform} on your phone and upload it from your gallery.`,
+      );
+      window.setTimeout(() => setPlatformHint(null), 6000);
+    },
+    [photoUrl, playerName, roomCode],
+  );
+
   const shareVideo = React.useCallback(async () => {
     if (!videoUrl) return;
     const res = await fetch(videoUrl);
@@ -711,6 +778,37 @@ export function CameraRecorder({ open, onOpenChange, playerName, roomCode }: Pro
                     Retake
                   </Button>
                 </div>
+
+                <div className="mt-1 text-[10px] font-black tracking-widest text-[var(--muted)]">
+                  SHARE TO
+                </div>
+                <div className="grid grid-cols-4 gap-1.5">
+                  {(
+                    [
+                      ["Facebook", "📘"],
+                      ["Instagram", "📷"],
+                      ["Snapchat", "👻"],
+                      ["TikTok", "🎵"],
+                    ] as const
+                  ).map(([name, icon]) => (
+                    <button
+                      key={name}
+                      type="button"
+                      onClick={() => shareToPlatform(name)}
+                      className="flex flex-col items-center gap-0.5 rounded-xl border border-white/12 bg-white/5 px-1 py-2 text-[10px] font-black hover:bg-white/10"
+                      aria-label={`Share to ${name}`}
+                    >
+                      <span className="text-lg leading-none">{icon}</span>
+                      <span>{name}</span>
+                    </button>
+                  ))}
+                </div>
+                {platformHint ? (
+                  <div className="rounded-lg border border-white/12 bg-white/5 px-2 py-1.5 text-[11px] text-[var(--muted)]">
+                    {platformHint}
+                  </div>
+                ) : null}
+
                 {wallStatus === "posted" ? (
                   <div className="flex items-center justify-between gap-2 rounded-xl border border-[color-mix(in_oklab,var(--green),transparent_50%)] bg-[color-mix(in_oklab,var(--green),transparent_88%)] px-3 py-2 text-xs font-black">
                     <span className="truncate">Posted to the wall.</span>
@@ -754,8 +852,8 @@ export function CameraRecorder({ open, onOpenChange, playerName, roomCode }: Pro
           </div>
 
           <div className="mt-2 text-[11px] text-[var(--muted)]">
-            On mobile this opens your share sheet (Instagram, Snapchat, SMS, Messenger, …). On
-            desktop the file downloads instead.
+            On phone, Share opens your share sheet with Facebook, Instagram, Snapchat, TikTok and
+            more. On desktop the photo downloads so you can upload it manually.
           </div>
         </NeonCard>
       </div>
